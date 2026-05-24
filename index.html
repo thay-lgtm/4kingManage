@@ -367,17 +367,26 @@ function isGASConfigured() {
 // API HELPER
 // ================================
 async function gasRequest(action, payload) {
+  // Google Apps Script requires no-cors for POST, use GET with encoded body for save
   const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
+
+  if (payload) {
+    // Encode data as base64 in URL param to avoid CORS preflight
+    const encoded = encodeURIComponent(JSON.stringify(payload));
+    url.searchParams.set('data', encoded);
+  }
+
   const res = await fetch(url.toString(), {
-    method: payload ? 'POST' : 'GET',
-    headers: payload ? { 'Content-Type': 'text/plain' } : {},
-    body: payload ? JSON.stringify(payload) : undefined,
+    method: 'GET',
     redirect: 'follow',
-    mode: 'cors',
   });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
+  // Guard: GAS sometimes returns HTML on error
+  if (text.trim().startsWith('<')) {
+    throw new Error('GAS returned HTML — check deployment settings');
+  }
   return JSON.parse(text);
 }
 
