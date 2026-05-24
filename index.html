@@ -264,6 +264,20 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       </div>
       <button class="btn btn-gold lbtn" id="lbtn" onclick="doLogin()">ເຂົ້າລະບົບ →</button>
       <div class="lhint">ທົດລອງ: admin / admin &nbsp;|&nbsp; staff / staff</div>
+      <div id="cloud-status-hint" style="margin-top:12px;padding:8px 12px;border-radius:8px;font-size:10px;letter-spacing:.5px;text-align:center;background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.25);color:rgba(255,100,100,0.8);">
+        ⚠ ຍັງໃຊ້ localStorage — ຕ້ອງຕັ້ງຄ່າ Google Sheets ກ່ອນ
+      </div>
+      <script>
+        (function(){
+          const JBID = document.currentScript.closest('body').innerHTML.match(/JSONBIN_ID\s*=\s*'([^']+)'/)?.[1]||'';
+          const hint = document.getElementById('cloud-status-hint');
+          // show/hide after DOM ready
+          window.addEventListener('DOMContentLoaded', function(){
+            const h = document.getElementById('cloud-status-hint');
+            if(h) h.style.display = (JBID && !JBID.includes('ໃສ່_')) ? 'none' : 'block';
+          });
+        })();
+      <\/script>
     </div>
   </div>
 </div>
@@ -297,6 +311,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="nb" id="nbbtn" onclick="navigate('notif')">🔔<div class="nd2" id="nbadge">0</div></div>
         <div style="color:var(--text-faint);font-size:12px;">|</div>
+        <span id="syncind" title="ສະຖານະ Cloud" style="font-size:15px;cursor:default;transition:color .3s;">☁️</span>
         <div class="lc" id="clk">00:00:00</div>
       </div>
     </div>
@@ -315,22 +330,136 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 
 <script>
 // ============================================================
-// STORAGE
+// STORAGE — Google Sheets (Shared Online Database)
 // ============================================================
-const SK = '4khing_v1';
+// 🔧 ຕັ້ງຄ່າ: ໃສ່ URL ຂອງ Google Apps Script Web App ຂ້າງລຸ່ມ
+// (ເບິ່ງໄຟລ໌ Code.gs ສຳລັບຂັ້ນຕອນ Deploy)
+const GAS_URL = 'ໃສ່_APPS_SCRIPT_URL_ຢູ່ນີ້';
+// e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
 
-function loadData(){
-  try{
-    const d=localStorage.getItem(SK);
-    if(d) return JSON.parse(d);
-  }catch(e){}
-  return null;
+const SK = '4khing_v1_cache'; // localStorage cache
+
+// ================================
+// SYNC STATE
+// ================================
+let _saveTimer   = null;
+let _isSaving    = false;
+let _syncIndicator = null;
+
+function showSyncStatus(status) {
+  if (!_syncIndicator) {
+    _syncIndicator = document.getElementById('syncind');
+  }
+  if (!_syncIndicator) return;
+  const icons  = { saving:'⏳', saved:'🟢', error:'🔴', loading:'🔄' };
+  const colors = { saving:'var(--gold)', saved:'var(--green)', error:'var(--red)', loading:'var(--blue)' };
+  const labels = { saving:'ກຳລັງບັນທຶກ...', saved:'Sheets sync ສຳເລັດ', error:'Sheets sync ລົ້ມເຫຼວ', loading:'ກຳລັງດຶງຂໍ້ມູນ...' };
+  _syncIndicator.textContent = icons[status] || '☁️';
+  _syncIndicator.style.color = colors[status] || 'var(--gold)';
+  _syncIndicator.title = labels[status] || '';
 }
 
-function saveData(){
-  try{ localStorage.setItem(SK, JSON.stringify(DB)); }catch(e){ showToast('⚠ ບໍ່ສາມາດບັນທຶກໄດ້','error'); }
+function isGASConfigured() {
+  return GAS_URL && !GAS_URL.includes('ໃສ່_') && GAS_URL.startsWith('https://');
 }
 
+// ================================
+// API HELPER
+// ================================
+async function gasRequest(action, payload) {
+  const url = new URL(GAS_URL);
+  url.searchParams.set('action', action);
+  const res = await fetch(url.toString(), {
+    method: payload ? 'POST' : 'GET',
+    headers: payload ? { 'Content-Type': 'text/plain' } : {},
+    body: payload ? JSON.stringify(payload) : undefined,
+    redirect: 'follow',
+    mode: 'cors',
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const text = await res.text();
+  return JSON.parse(text);
+}
+
+// ================================
+// LOAD FROM GOOGLE SHEETS
+// ================================
+async function loadData() {
+  if (!isGASConfigured()) {
+    try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e) {}
+    return null;
+  }
+  try {
+    showSyncStatus('loading');
+    const result = await gasRequest('load');
+    if (result && result.ok && result.data) {
+      const data = result.data;
+      localStorage.setItem(SK, JSON.stringify(data));
+      showSyncStatus('saved');
+      return data;
+    }
+    throw new Error(result?.error || 'No data');
+  } catch(e) {
+    console.warn('Sheets load failed:', e);
+    showSyncStatus('error');
+    try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e2) {}
+    return null;
+  }
+}
+
+// ================================
+// SAVE TO GOOGLE SHEETS (debounced)
+// ================================
+function saveData() {
+  try { localStorage.setItem(SK, JSON.stringify(DB)); } catch(e) {}
+  if (!isGASConfigured()) return;
+
+  showSyncStatus('saving');
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    if (_isSaving) { _saveTimer = setTimeout(arguments.callee, 800); return; }
+    _isSaving = true;
+    try {
+      const result = await gasRequest('save', DB);
+      if (!result || !result.ok) throw new Error(result?.error || 'save failed');
+      showSyncStatus('saved');
+    } catch(e) {
+      console.error('Sheets save failed:', e);
+      showSyncStatus('error');
+      showToast('⚠ Google Sheets sync ລົ້ມເຫຼວ — cache ໄວ້ໃນ browser', 'error');
+    } finally {
+      _isSaving = false;
+    }
+  }, 1500);
+}
+
+// ================================
+// POLLING — sync ທຸກ 30s
+// ================================
+let _pollSig = '';
+async function pollCloud() {
+  if (!isGASConfigured() || !SESSION || !SESSION.user) return;
+  try {
+    const result = await gasRequest('load');
+    if (!result || !result.ok || !result.data) return;
+    const data = result.data;
+    const sig = (data.actLogs?.[0]?.id || '') + '_' + (data.revenues?.length || 0);
+    if (sig !== _pollSig && _pollSig !== '') {
+      _pollSig = sig;
+      Object.assign(DB, data);
+      localStorage.setItem(SK, JSON.stringify(DB));
+      navigate(SESSION.page);
+      updateBadge();
+      showToast('🔄 ຂໍ້ມູນອັບເດດຈາກ Google Sheets', 'info');
+    } else {
+      _pollSig = sig;
+    }
+  } catch(e) {}
+}
+
+function startPolling() {
+  setInterval(pollCloud, 30000);
+}
 // ============================================================
 // DEFAULT DATA
 // ============================================================
@@ -390,7 +519,12 @@ const DEFAULT = {
   },
 };
 
-let DB = loadData() || JSON.parse(JSON.stringify(DEFAULT));
+// DB loads from cache first; fresh cloud data pulled on login
+function loadDataSync(){
+  try{ const d=localStorage.getItem(SK); if(d) return JSON.parse(d); }catch(e){}
+  return null;
+}
+let DB = loadDataSync() || JSON.parse(JSON.stringify(DEFAULT));
 
 // Session (not persisted)
 let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, calcAmount:3000000, page:'dashboard' };
@@ -479,29 +613,39 @@ function closeModal(){ document.getElementById('mover').classList.add('hidden');
 // ============================================================
 // AUTH
 // ============================================================
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('iu').value.trim();
   const p=document.getElementById('ip').value.trim();
   const btn=document.getElementById('lbtn');
   if(!u||!p){ showErrLogin('ກະລຸນາໃສ່ຊື່ຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານ'); return; }
-  btn.textContent='ກຳລັງກວດສອບ...'; btn.disabled=true;
-  setTimeout(()=>{
-    const user = DB.users.find(x=>x.username===u && x.password===p);
-    if(user){
-      SESSION.user=user;
-      document.getElementById('udis').textContent=user.name;
-      document.getElementById('rdis').textContent=user.role==='admin'?'ADMIN':'STAFF';
-      document.getElementById('lp').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      addLog(user.name,'ເຂົ້າສູ່ລະບົບ','login');
-      buildNav();
-      updateBadge();
-      navigate('dashboard');
-    } else {
-      showErrLogin('❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ');
+  btn.textContent='ກຳລັງດຶງຂໍ້ມູນ cloud...'; btn.disabled=true;
+
+  // ດຶງຂໍ້ມູນລ່າສຸດຈາກ cloud ກ່ອນ login
+  const fresh = await loadData();
+  if(fresh) Object.assign(DB, fresh);
+
+  const user = DB.users.find(x=>x.username===u && x.password===p);
+  if(user){
+    SESSION.user=user;
+    // ຕັ້ງຄ່າ sync indicator
+    _syncIndicator = document.getElementById('syncind');
+    showSyncStatus(isGASConfigured() ? 'saved' : 'error');
+    if(!isGASConfigured()){
+      showToast('⚠ Google Sheets ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ — ໃຊ້ localStorage ແທນ','error');
     }
-    btn.textContent='ເຂົ້າລະບົບ →'; btn.disabled=false;
-  },900);
+    document.getElementById('udis').textContent=user.name;
+    document.getElementById('rdis').textContent=user.role==='admin'?'ADMIN':'STAFF';
+    document.getElementById('lp').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    addLog(user.name,'ເຂົ້າສູ່ລະບົບ','login');
+    buildNav();
+    updateBadge();
+    navigate('dashboard');
+    startPolling(); // ເລີ່ມ sync ທຸກ 30s
+  } else {
+    showErrLogin('❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ');
+  }
+  btn.textContent='ເຂົ້າລະບົບ →'; btn.disabled=false;
 }
 function showErrLogin(msg){ const e=document.getElementById('lerr'); e.textContent=msg; e.classList.remove('hidden'); }
 function doLogout(){
@@ -1706,7 +1850,7 @@ function pgSettings(){
 
     <div class="card p24">
       <div class="st">ຂໍ້ມູນລະບົບ</div>
-      ${[['ລະບົບ','4Khing Management System v2.0'],['ຖານຂໍ້ມູນ','localStorage (Browser)'],['ພະນັກງານ',DB.employees.length+' ຄົນ'],['ລາຍຮັບທັງໝົດ',DB.revenues.length+' ລາຍການ'],['ລາຍຈ່າຍ',DB.expenses.length+' ລາຍການ'],['Activity Logs',DB.actLogs.length+' ລາຍການ'],['ສະຖານະ','✓ ທຸກລະບົບທຳງານ']].map(([k,v])=>`
+      ${[['ລະບົບ','4Khing Management System v2.0'],['ຖານຂໍ້ມູນ', isGASConfigured() ? '✅ Google Sheets' : '⚠ localStorage (ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ)'],['ພະນັກງານ',DB.employees.length+' ຄົນ'],['ລາຍຮັບທັງໝົດ',DB.revenues.length+' ລາຍການ'],['ລາຍຈ່າຍ',DB.expenses.length+' ລາຍການ'],['Activity Logs',DB.actLogs.length+' ລາຍການ'],['ສະຖານະ','✓ ທຸກລະບົບທຳງານ']].map(([k,v])=>`
       <div class="rrow2"><span class="td">${k}</span><span style="color:var(--green);font-size:13px;">${v}</span></div>`).join('')}
     </div>
   </div>`;
