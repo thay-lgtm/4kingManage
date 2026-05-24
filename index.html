@@ -267,16 +267,12 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       <div id="cloud-status-hint" style="margin-top:12px;padding:8px 12px;border-radius:8px;font-size:10px;letter-spacing:.5px;text-align:center;background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.25);color:rgba(255,100,100,0.8);">
         ⚠ ຍັງໃຊ້ localStorage — ຕ້ອງຕັ້ງຄ່າ Google Sheets ກ່ອນ
       </div>
-      <script>
-        (function(){
-          const JBID = document.currentScript.closest('body').innerHTML.match(/JSONBIN_ID\s*=\s*'([^']+)'/)?.[1]||'';
-          const hint = document.getElementById('cloud-status-hint');
-          // show/hide after DOM ready
-          window.addEventListener('DOMContentLoaded', function(){
-            const h = document.getElementById('cloud-status-hint');
-            if(h) h.style.display = (JBID && !JBID.includes('ໃສ່_')) ? 'none' : 'block';
-          });
-        })();
+            <script>
+        window.addEventListener('DOMContentLoaded', function(){
+          const h = document.getElementById('cloud-status-hint');
+          const configured = typeof GAS_URL !== 'undefined' && GAS_URL && !GAS_URL.includes('ໃສ່_') && GAS_URL.startsWith('https://');
+          if(h) h.style.display = configured ? 'none' : 'block';
+        });
       <\/script>
     </div>
   </div>
@@ -334,7 +330,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 // ============================================================
 // 🔧 ຕັ້ງຄ່າ: ໃສ່ URL ຂອງ Google Apps Script Web App ຂ້າງລຸ່ມ
 // (ເບິ່ງໄຟລ໌ Code.gs ສຳລັບຂັ້ນຕອນ Deploy)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwcRDnxX64Wir8HmI2VNjuz7uZJKMB5DWMi-ApKpmBab8ji5zseoC8kMI3SaZgJvEU/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyCkvUD7_joZP5zcsP6dLHFfRat6USAX0OCjFAVtKdbkpCG71PMUOm4YMhB6prxzNKZnA/exec';
 // e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
 
 const SK = '4khing_v1_cache'; // localStorage cache
@@ -367,26 +363,15 @@ function isGASConfigured() {
 // API HELPER
 // ================================
 async function gasRequest(action, payload) {
-  // Google Apps Script requires no-cors for POST, use GET with encoded body for save
   const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
-
   if (payload) {
-    // Encode data as base64 in URL param to avoid CORS preflight
-    const encoded = encodeURIComponent(JSON.stringify(payload));
-    url.searchParams.set('data', encoded);
+    url.searchParams.set('data', encodeURIComponent(JSON.stringify(payload)));
   }
-
-  const res = await fetch(url.toString(), {
-    method: 'GET',
-    redirect: 'follow',
-  });
+  const res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   const text = await res.text();
-  // Guard: GAS sometimes returns HTML on error
-  if (text.trim().startsWith('<')) {
-    throw new Error('GAS returned HTML — check deployment settings');
-  }
+  if (text.trim().startsWith('<')) throw new Error('GAS returned HTML — redeploy needed');
   return JSON.parse(text);
 }
 
