@@ -265,7 +265,6 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       <button class="btn btn-gold lbtn" id="lbtn" onclick="doLogin()">ເຂົ້າລະບົບ →</button>
       <div class="lhint">ທົດລອງ: admin / admin &nbsp;|&nbsp; staff / staff</div>
 
-      
     </div>
   </div>
 </div>
@@ -322,7 +321,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 // ============================================================
 // 🔧 ຕັ້ງຄ່າ: ໃສ່ URL ຂອງ Google Apps Script Web App ຂ້າງລຸ່ມ
 // (ເບິ່ງໄຟລ໌ Code.gs ສຳລັບຂັ້ນຕອນ Deploy)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxZFIa0bEN93Tq7QmonwFfTXhSpkIsO6FuxubsW8kFDjxjtVjN0C0sINKfu-mHasGFl6Q/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3Vg_XKzgBOciyEVwnDGc8pv2QI-zPhmL_POUwVgfW1wnAXN4kHJmjTDY9j2SSJUdJ/exec';
 // e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
 
 const SK = '4khing_v1_cache'; // localStorage cache
@@ -352,38 +351,35 @@ function isGASConfigured() {
 }
 
 // ================================
-// API HELPER
+// API HELPER — JSONP (CORS-free)
 // ================================
-async function gasRequest(action, payload) {
+function gasRequest(action, payload) {
   return new Promise((resolve, reject) => {
-    const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+    const cbName = '_cb' + Date.now() + Math.floor(Math.random()*9999);
     const url = new URL(GAS_URL);
     url.searchParams.set('action', action);
     url.searchParams.set('callback', cbName);
     if (payload) {
       url.searchParams.set('data', encodeURIComponent(JSON.stringify(payload)));
     }
-
     window[cbName] = function(data) {
       delete window[cbName];
-      document.head.removeChild(script);
+      if (script.parentNode) script.parentNode.removeChild(script);
       resolve(data);
     };
-
     const script = document.createElement('script');
     script.src = url.toString();
-    script.onerror = () => {
+    script.onerror = function() {
       delete window[cbName];
-      document.head.removeChild(script);
-      reject(new Error('Failed to fetch'));
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('JSONP failed'));
     };
-    setTimeout(() => {
-      if (window[cbName]) {
-        delete window[cbName];
-        try { document.head.removeChild(script); } catch(e) {}
-        reject(new Error('Timeout'));
-      }
+    const timer = setTimeout(function() {
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      reject(new Error('Timeout'));
     }, 15000);
+    script._timer = timer;
     document.head.appendChild(script);
   });
 }
@@ -400,10 +396,14 @@ async function loadData() {
     showSyncStatus('loading');
     const result = await gasRequest('load');
     if (result && result.ok && result.data) {
-      const data = result.data;
-      localStorage.setItem(SK, JSON.stringify(data));
+      localStorage.setItem(SK, JSON.stringify(result.data));
       showSyncStatus('saved');
-      return data;
+      return result.data;
+    }
+    // ok:true but data:null means sheet empty — use defaults
+    if (result && result.ok) {
+      showSyncStatus('saved');
+      return null;
     }
     throw new Error(result?.error || 'No data');
   } catch(e) {
@@ -420,10 +420,9 @@ async function loadData() {
 function saveData() {
   try { localStorage.setItem(SK, JSON.stringify(DB)); } catch(e) {}
   if (!isGASConfigured()) return;
-
   showSyncStatus('saving');
   clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async () => {
+  _saveTimer = setTimeout(async function() {
     if (_isSaving) { _saveTimer = setTimeout(arguments.callee, 800); return; }
     _isSaving = true;
     try {
@@ -433,7 +432,7 @@ function saveData() {
     } catch(e) {
       console.error('Sheets save failed:', e);
       showSyncStatus('error');
-      showToast('⚠ Google Sheets sync ລົ້ມເຫຼວ — cache ໄວ້ໃນ browser', 'error');
+      showToast('⚠ Sheets sync ລົ້ມເຫຼວ — cache ໄວ້ໃນ browser', 'error');
     } finally {
       _isSaving = false;
     }
@@ -457,7 +456,7 @@ async function pollCloud() {
       localStorage.setItem(SK, JSON.stringify(DB));
       navigate(SESSION.page);
       updateBadge();
-      showToast('🔄 ຂໍ້ມູນອັບເດດຈາກ Google Sheets', 'info');
+      showToast('🔄 ຂໍ້ມູນອັບເດດຈາກ Google Sheets');
     } else {
       _pollSig = sig;
     }
@@ -467,6 +466,7 @@ async function pollCloud() {
 function startPolling() {
   setInterval(pollCloud, 30000);
 }
+
 // ============================================================
 // DEFAULT DATA
 // ============================================================
