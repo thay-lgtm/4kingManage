@@ -264,16 +264,10 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       </div>
       <button class="btn btn-gold lbtn" id="lbtn" onclick="doLogin()">ເຂົ້າລະບົບ →</button>
       <div class="lhint">ທົດລອງ: admin / admin &nbsp;|&nbsp; staff / staff</div>
-      <div id="cloud-status-hint" style="margin-top:12px;padding:8px 12px;border-radius:8px;font-size:10px;letter-spacing:.5px;text-align:center;background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.25);color:rgba(255,100,100,0.8);">
+      <div id="cloud-status-hint" style="display:none;">
         ⚠ ຍັງໃຊ້ localStorage — ຕ້ອງຕັ້ງຄ່າ Google Sheets ກ່ອນ
       </div>
-            <script>
-        window.addEventListener('DOMContentLoaded', function(){
-          const h = document.getElementById('cloud-status-hint');
-          const configured = typeof GAS_URL !== 'undefined' && GAS_URL && !GAS_URL.includes('ໃສ່_') && GAS_URL.startsWith('https://');
-          if(h) h.style.display = configured ? 'none' : 'block';
-        });
-      <\/script>
+      
     </div>
   </div>
 </div>
@@ -330,7 +324,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 // ============================================================
 // 🔧 ຕັ້ງຄ່າ: ໃສ່ URL ຂອງ Google Apps Script Web App ຂ້າງລຸ່ມ
 // (ເບິ່ງໄຟລ໌ Code.gs ສຳລັບຂັ້ນຕອນ Deploy)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyCkvUD7_joZP5zcsP6dLHFfRat6USAX0OCjFAVtKdbkpCG71PMUOm4YMhB6prxzNKZnA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxZFIa0bEN93Tq7QmonwFfTXhSpkIsO6FuxubsW8kFDjxjtVjN0C0sINKfu-mHasGFl6Q/exec';
 // e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
 
 const SK = '4khing_v1_cache'; // localStorage cache
@@ -363,16 +357,37 @@ function isGASConfigured() {
 // API HELPER
 // ================================
 async function gasRequest(action, payload) {
-  const url = new URL(GAS_URL);
-  url.searchParams.set('action', action);
-  if (payload) {
-    url.searchParams.set('data', encodeURIComponent(JSON.stringify(payload)));
-  }
-  const res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
-  if (!res.ok) throw new Error('HTTP ' + res.status);
-  const text = await res.text();
-  if (text.trim().startsWith('<')) throw new Error('GAS returned HTML — redeploy needed');
-  return JSON.parse(text);
+  return new Promise((resolve, reject) => {
+    const cbName = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+    const url = new URL(GAS_URL);
+    url.searchParams.set('action', action);
+    url.searchParams.set('callback', cbName);
+    if (payload) {
+      url.searchParams.set('data', encodeURIComponent(JSON.stringify(payload)));
+    }
+
+    window[cbName] = function(data) {
+      delete window[cbName];
+      document.head.removeChild(script);
+      resolve(data);
+    };
+
+    const script = document.createElement('script');
+    script.src = url.toString();
+    script.onerror = () => {
+      delete window[cbName];
+      document.head.removeChild(script);
+      reject(new Error('Failed to fetch'));
+    };
+    setTimeout(() => {
+      if (window[cbName]) {
+        delete window[cbName];
+        try { document.head.removeChild(script); } catch(e) {}
+        reject(new Error('Timeout'));
+      }
+    }, 15000);
+    document.head.appendChild(script);
+  });
 }
 
 // ================================
