@@ -3293,7 +3293,7 @@ function pgReports(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[
           ['ມື້',       ()=>[today(),today()]],
-          ['ມານວ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
+          ['ມື້ວານ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
           ['ອາທິດນີ້', ()=>{ const d=new Date();const dow=d.getDay()===0?6:d.getDay()-1;const ws=new Date(d);ws.setDate(d.getDate()-dow);return[ws.toISOString().slice(0,10),today()]; }],
           ['ເດືອນນີ້', ()=>[today().slice(0,7)+'-01',today()]],
           ['7 ມື້',    ()=>{ const d=new Date();d.setDate(d.getDate()-6);return[d.toISOString().slice(0,10),today()]; }],
