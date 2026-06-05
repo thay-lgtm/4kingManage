@@ -551,9 +551,9 @@ const DEFAULT = {
     {id:4,name:'ເງິນສຳຮອງ',amount:10000000,category:'ສຳຮອງ',date:'2026-05-01'},
   ],
   partners:[
-    {id:1,name:'ເທ້',share:40,color:'#FFD700'},
+    {id:1,name:'ເຈົ້າຂອງ',share:40,color:'#FFD700'},
     {id:2,name:'ອ້າຍເປີ້ນ',share:20,color:'#FFA500'},
-    {id:3,name:'ອ້າຍຕຸ້ຍ',share:20,color:'#FF8C00'},
+    {id:3,name:'ອ້າຕຸ້ຍ',share:20,color:'#FF8C00'},
     {id:4,name:'ພີ່ເກັ່ງ',share:20,color:'#FFB347'},
   ],
   commTiers:[
@@ -1220,29 +1220,46 @@ function delEmp(id){
 // PAGE: SHIFT
 // ============================================================
 function pgShift(){
+  const myEmp = DB.employees.find(x=>x.username===SESSION.user.username||x.name===SESSION.user.name);
   document.getElementById('ct').innerHTML=`
   <div class="g20 ai">
     <div class="ph"><div class="pt">ຕິດຕາມ Shift</div></div>
 
     <div class="card ${SESSION.shiftActive?'glow-green':''} p32" style="text-align:center;">
       <div style="font-size:50px;margin-bottom:10px;">${SESSION.shiftActive?'🟢':'⭕'}</div>
-      <div style="color:${SESSION.shiftActive?'var(--green)':'var(--text-dim)'};font-size:13px;letter-spacing:2px;margin-bottom:8px;">${SESSION.shiftActive?'SHIFT ກຳລັງດຳເນີນ':'SHIFT ຍັງບໍ່ເລີ່ມ'}</div>
-      <div class="sti ${SESSION.shiftActive?'':'hidden'}" id="sti">${fmtT(SESSION.shiftElapsed)}</div>
-      <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;">
+      <div style="color:${SESSION.shiftActive?'var(--green)':'var(--text-dim)'};font-size:13px;letter-spacing:2px;margin-bottom:8px;">
+        ${SESSION.shiftActive?'SHIFT ກຳລັງດຳເນີນ — '+SESSION.user.name:'SHIFT ຍັງບໍ່ເລີ່ມ'}
+      </div>
+      <div class="sti ${SESSION.shiftActive?'':' hidden'}" id="sti">${fmtT(SESSION.shiftElapsed)}</div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
         ${!SESSION.shiftActive
-          ?`<button class="btn btn-green" onclick="startShift()">▶ ເລີ່ມ Shift</button>`
-          :`<button class="btn btn-stop" onclick="tryEndShift()">■ ສິ້ນສຸດ Shift</button>`
+          ?`<button class="btn btn-green" style="font-size:15px;padding:16px 36px;" onclick="startShift()">▶ ເລີ່ມ Shift</button>`
+          :`<button class="btn btn-stop" style="font-size:15px;padding:16px 36px;" onclick="tryEndShift()">■ ສິ້ນສຸດ Shift</button>`
         }
       </div>
+      ${myEmp?`<div style="margin-top:14px;font-size:11px;color:var(--text-dim);">Shift ຂອງທ່ານ: <span style="color:var(--gold);">${myEmp.shift}</span></div>`:''}
     </div>
+
+    ${SESSION.shiftActive?`
+    <div class="card glow p24">
+      <div class="st" style="color:var(--green);">⚡ ບັນທຶກລາຍຮັບລະຫວ່າງ Shift</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-bottom:12px;">
+        <div class="fgr"><label>ລາຍຮັບ (₭)</label><input type="number" id="sq-amt" placeholder="0" min="0"></div>
+        <div class="fgr"><label>ຝາກ (₭)</label><input type="number" id="sq-dep" placeholder="0" min="0"></div>
+        <div class="fgr"><label>ຖອນ (₭)</label><input type="number" id="sq-wth" placeholder="0" min="0"></div>
+        <div class="fgr"><label>ລາງວັນ (₭)</label><input type="number" id="sq-prz" placeholder="0" min="0"></div>
+        <div class="fgr"><label>ໝາຍເຫດ</label><input type="text" id="sq-nt" placeholder="ໝາຍເຫດ..."></div>
+      </div>
+      <button class="btn btn-gold" onclick="addQuickRev()">+ ບັນທຶກລາຍຮັບ</button>
+    </div>`:''}
 
     <div class="card p24">
       <div class="st">ສະຖານະ Shift ທຸກຄົນ</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:11px;">
         ${DB.employees.map(e=>`
-        <div class="card p16" style="border-color:rgba(255,215,0,0.07);">
+        <div class="card p16" style="border-color:${e.status==='ONLINE'?'rgba(0,255,136,0.2)':'rgba(255,215,0,0.07)'};">
           <div style="display:flex;justify-content:space-between;margin-bottom:7px;">
-            <span style="font-weight:700;">${e.name}</span>
+            <span style="font-weight:700;">${e.name}${e.username===SESSION.user.username?' <span style="font-size:9px;color:var(--gold);">(ທ່ານ)</span>':''}</span>
             ${statusBadge(e.status)}
           </div>
           <div class="td" style="font-size:11px;">Shift: ${e.shift}</div>
@@ -1258,7 +1275,7 @@ function pgShift(){
         <table>
           <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ເລີ່ມ</th><th>ສິ້ນສຸດ</th><th>ຊົ່ວໂມງ</th><th>ລາຍຮັບ</th></tr></thead>
           <tbody>
-            ${DB.shiftLogs.slice(0,10).map(s=>`<tr>
+            ${DB.shiftLogs.slice(0,15).map(s=>`<tr>
               <td class="td">${s.date}</td>
               <td class="tg bold">${s.empName}</td>
               <td class="td">${s.startTime}</td>
@@ -1273,6 +1290,20 @@ function pgShift(){
     </div>
   </div>`;
   if(SESSION.shiftActive) resumeShiftTimer();
+}
+
+function addQuickRev(){
+  const amt=Number(document.getElementById('sq-amt').value)||0;
+  if(!amt){ showToast('ໃສ່ຈຳນວນລາຍຮັບ','error'); return; }
+  const dep=Number(document.getElementById('sq-dep').value)||0;
+  const wth=Number(document.getElementById('sq-wth').value)||0;
+  const prz=Number(document.getElementById('sq-prz').value)||0;
+  const nt=document.getElementById('sq-nt').value||'ບັນທຶກລະຫວ່າງ Shift';
+  DB.revenues.unshift({id:uid(),date:today(),empId:SESSION.user.id,empName:SESSION.user.name,amount:amt,deposit:dep,withdraw:wth,prize:prz,bonus:0,notes:nt,shiftReport:false});
+  addLog(SESSION.user.name,`ບັນທຶກລາຍຮັບ ${fmt(amt)} ລະຫວ່າງ Shift`,'revenue');
+  saveData();
+  ['sq-amt','sq-dep','sq-wth','sq-prz','sq-nt'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  showToast(`ບັນທຶກລາຍຮັບ ${fmt(amt)} ສຳເລັດ`);
 }
 
 function startShift(){
@@ -1614,10 +1645,14 @@ function renderPartnerCards(){
   const profit=netProfit();
   const total=DB.partners.reduce((a,b)=>a+b.share,0);
   const warn=document.getElementById('pwarn');
-  if(warn) warn.classList.toggle('hidden',total===100);
+  if(warn) warn.classList.toggle('hidden',Math.round(total)===100);
   el.innerHTML=DB.partners.map((p,i)=>`
-  <div class="card p24" style="text-align:center;border-color:${p.color}20;">
-    <div style="width:54px;height:54px;border-radius:50%;background:${p.color}16;border:3px solid ${p.color};margin:0 auto 13px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 16px ${p.color}30;">👑</div>
+  <div class="card p24" style="text-align:center;border-color:${p.color}33;">
+    <div style="display:flex;justify-content:flex-end;gap:5px;margin-bottom:6px;">
+      <button class="btn btn-outline" style="font-size:10px;padding:3px 9px;" onclick="editPartner(${i})">✏ ແກ້ໄຂ</button>
+      <button class="btn btn-red" style="font-size:10px;padding:3px 9px;" onclick="delPartner(${i})">✕</button>
+    </div>
+    <div style="width:54px;height:54px;border-radius:50%;background:${p.color}16;border:3px solid ${p.color};margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 0 16px ${p.color}30;">👑</div>
     <div style="font-weight:800;font-size:15px;margin-bottom:9px;">${p.name}</div>
     <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:11px;">
       <input type="number" min="0" max="100" value="${p.share}" class="psi" style="color:${p.color};border-color:${p.color}44;" oninput="DB.partners[${i}].share=Number(this.value);renderPartnerCards()">
@@ -1625,27 +1660,53 @@ function renderPartnerCards(){
     </div>
     <div style="color:${p.color};font-size:19px;font-weight:900;font-family:'Orbitron',monospace;">${fmt(profit*p.share/100)}</div>
     <div style="margin-top:10px;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;">
-      <div style="height:100%;width:${p.share}%;background:${p.color};border-radius:2px;box-shadow:0 0 7px ${p.color};"></div>
+      <div style="height:100%;width:${Math.min(p.share,100)}%;background:${p.color};border-radius:2px;box-shadow:0 0 7px ${p.color};"></div>
     </div>
-    <button class="btn btn-red" style="font-size:10px;padding:4px 10px;margin-top:12px;" onclick="delPartner(${i})">ລຶບ</button>
   </div>`).join('');
 }
 
 function savePartners(){ saveData(); addLog(SESSION.user.name,'ອັບເດດສ່ວນແບ່ງຫຸ້ນສ່ວນ','settings'); showToast('ບັນທຶກສຳເລັດ'); }
-function delPartner(i){ if(!confirm('ລຶບຫຸ້ນສ່ວນນີ້?')) return; DB.partners.splice(i,1); renderPartnerCards(); }
+function delPartner(i){ if(!confirm('ລຶບຫຸ້ນສ່ວນນີ້?')) return; DB.partners.splice(i,1); saveData(); renderPartnerCards(); showToast('ລຶບແລ້ວ'); }
+
+function editPartner(i){
+  const p=DB.partners[i];
+  showModal('✏ ແກ້ໄຂຫຸ້ນສ່ວນ',`
+    <div class="fg">
+      <div class="fgr"><label>ຊື່ຫຸ້ນສ່ວນ</label><input id="ep-n" value="${p.name}"></div>
+      <div class="fr">
+        <div class="fgr"><label>ສ່ວນແບ່ງ %</label><input id="ep-s" type="number" value="${p.share}" min="0" max="100"></div>
+        <div class="fgr"><label>ສີ</label><input id="ep-c" type="color" value="${p.color}" style="height:40px;cursor:pointer;width:100%;"></div>
+      </div>
+    </div>`,
+    [{label:'💾 ບັນທຶກ',cls:'btn btn-gold',fn:()=>{
+      const name=document.getElementById('ep-n').value.trim();
+      const share=Number(document.getElementById('ep-s').value)||0;
+      const color=document.getElementById('ep-c').value;
+      if(!name){ showToast('ໃສ່ຊື່ກ່ອນ','error'); return; }
+      DB.partners[i]={...DB.partners[i],name,share,color};
+      addLog(SESSION.user.name,`ແກ້ໄຂຫຸ້ນສ່ວນ: ${name}`,'settings');
+      saveData(); closeModal(); renderPartnerCards();
+      showToast('ແກ້ໄຂຫຸ້ນສ່ວນສຳເລັດ');
+    }},{label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
+
 function openPartnerForm(x){
   showModal('ເພີ່ມຫຸ້ນສ່ວນ',`
     <div class="fg">
       <div class="fgr"><label>ຊື່ຫຸ້ນສ່ວນ</label><input id="pf-n" placeholder="ຊື່..."></div>
-      <div class="fgr"><label>ສ່ວນແບ່ງ %</label><input id="pf-s" type="number" placeholder="0" min="0" max="100"></div>
-      <div class="fgr"><label>ສີ</label><input id="pf-c" type="color" value="#FFD700" style="height:40px;cursor:pointer;"></div>
+      <div class="fr">
+        <div class="fgr"><label>ສ່ວນແບ່ງ %</label><input id="pf-s" type="number" placeholder="0" min="0" max="100"></div>
+        <div class="fgr"><label>ສີ</label><input id="pf-c" type="color" value="#FFD700" style="height:40px;cursor:pointer;width:100%;"></div>
+      </div>
     </div>`,
-    [{label:'ເພີ່ມ',cls:'btn btn-gold',fn:()=>{
+    [{label:'+ ເພີ່ມ',cls:'btn btn-gold',fn:()=>{
       const name=document.getElementById('pf-n').value.trim();
       const share=Number(document.getElementById('pf-s').value)||0;
       const color=document.getElementById('pf-c').value;
       if(!name){ showToast('ໃສ່ຊື່ກ່ອນ','error'); return; }
       DB.partners.push({id:uid(),name,share,color});
+      addLog(SESSION.user.name,`ເພີ່ມຫຸ້ນສ່ວນ: ${name}`,'settings');
       saveData(); closeModal(); renderPartnerCards();
       showToast('ເພີ່ມຫຸ້ນສ່ວນສຳເລັດ');
     }},{label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
