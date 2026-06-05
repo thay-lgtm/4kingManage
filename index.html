@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4Khing - ລະບົບຄຸ້ມຄອງ</title>
+<title>4king77 - ລະບົບຄຸ້ມຄອງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -244,7 +244,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div class="lcard">
     <div class="llogo">
       <div class="lcrown">👑</div>
-      <div class="ltitle">4KHING</div>
+      <div class="ltitle">4king77</div>
       <div class="lsub">ລະບົບຄຸ້ມຄອງຮ້ານເກມ</div>
     </div>
     <div class="card glow p32">
@@ -281,7 +281,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div id="sb">
     <div class="brand">
       <div class="bi">👑</div>
-      <div><div class="bn">4KHING</div><div class="bs">ສູນຄວບຄຸມ</div></div>
+      <div><div class="bn">4king77</div><div class="bs">ສູນຄວບຄຸມ</div></div>
     </div>
     <nav id="snav"></nav>
     <div class="uinfo">
@@ -330,8 +330,8 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 // ============================================================
 // STORAGE — Firebase Realtime Database (True Real-Time ~100ms)
 // ============================================================
-const SK       = '4khing_v1_cache';
-const FB_KEY   = '4khing_firebase_cfg'; // { dbUrl, apiKey }
+const SK       = '4king77_v1_cache';
+const FB_KEY   = '4king77_firebase_cfg'; // { dbUrl, apiKey }
 
 // Firebase config baked in — ທຸກຄົນໃຊ້ໄດ້ທັນທີ ບໍ່ຕ້ອງ setup
 const _FB_DEFAULT = {
@@ -406,7 +406,7 @@ async function fbWrite(path, data) {
 let _bc = null;
 function initBroadcast() {
   try {
-    _bc = new BroadcastChannel('4khing_realtime');
+    _bc = new BroadcastChannel('4king77_realtime');
     _bc.onmessage = function(e) {
       if (!SESSION || !SESSION.user) return;
       if (e.data && e.data.type === 'db_update' && e.data.db) {
@@ -449,7 +449,7 @@ let _pollSig = '';
 async function pollFirebase() {
   if (!isFirebaseConfigured() || !SESSION || !SESSION.user) return;
   try {
-    const data = await fbRead('4khing');
+    const data = await fbRead('4king77');
     if (!data) return;
     const incoming = JSON.stringify(data);
     const sig = incoming.length + '_' + (data.actLogs?.[0]?.id || '');
@@ -475,7 +475,7 @@ async function loadData() {
   if (isFirebaseConfigured()) {
     try {
       showSyncStatus('loading');
-      const data = await fbRead('4khing');
+      const data = await fbRead('4king77');
       if (data) {
         localStorage.setItem(SK, JSON.stringify(data));
         showSyncStatus('saved');
@@ -511,7 +511,7 @@ function saveData() {
     _isSaving = true;
     const h = dbHash();
     try {
-      await fbWrite('4khing', DB);
+      await fbWrite('4king77', DB);
       _lastSavedHash = h;
       showSyncStatus('saved');
     } catch(e) {
@@ -586,7 +586,7 @@ const DEFAULT = {
     monthTarget:150000000,
     dailyTarget:5000000,
     currency:'₭',
-    storeName:'4Khing Gaming',
+    storeName:'4king77 Gaming',
   },
   reserve:{
     balance: 10000000,
@@ -605,7 +605,7 @@ function loadDataSync(){
 let DB = loadDataSync() || JSON.parse(JSON.stringify(DEFAULT));
 
 // Session (not persisted) — shiftActive/shiftStart/shiftLogId ARE persisted via SHIFT_KEY
-const SHIFT_KEY = '4khing_shift_v1';
+const SHIFT_KEY = '4king77_shift_v1';
 let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, shiftLogId:null, calcAmount:3000000, page:'dashboard' };
 
 // ── Shift persistence helpers ─────────────────────────────────
@@ -933,7 +933,7 @@ function pgDashboard(){
     <!-- HEADER + FILTER BAR -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
       <div>
-        <div class="pt">4KHING ສູນຄວບຄຸມ</div>
+        <div class="pt">4king77 ສູນຄວບຄຸມ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -2132,7 +2132,7 @@ function exportShiftImage(shiftId){
   const emp        = DB.employees.find(e=>e.id===s.empId||e.name===s.empName);
   const tier       = getCommTier(totalRev);
   const commission = totalRev * tier.rate / 100;
-  const storeName  = DB.settings.storeName || '4Khing Gaming';
+  const storeName  = DB.settings.storeName || '4king77 Gaming';
 
   // ── CANVAS SETUP ──────────────────────────────────────────
   const W = 560, PADDING = 30;
@@ -2284,7 +2284,7 @@ function exportShiftImage(shiftId){
   // ── FOOTER ────────────────────────────────────────────────
   ctx.font      = '10px monospace';
   ctx.fillStyle = 'rgba(255,215,0,0.3)';
-  ctx.fillText(`Generated: ${new Date().toLocaleString()} | 4KHING System`, W/2, y+12);
+  ctx.fillText(`Generated: ${new Date().toLocaleString()} | 4king77 System`, W/2, y+12);
 
   // ── DOWNLOAD ──────────────────────────────────────────────
   const a = document.createElement('a');
@@ -3332,7 +3332,7 @@ function pgReports(){
     </div>
 
     <div style="text-align:center;color:var(--text-faint);font-size:10px;letter-spacing:1px;padding:8px 0;">
-      4KHING · ${DB.settings.storeName||'4Khing Gaming'} · ${SESSION.user.name} · ${new Date().toLocaleString()}
+      4king77 · ${DB.settings.storeName||'4king77 Gaming'} · ${SESSION.user.name} · ${new Date().toLocaleString()}
     </div>
   </div>`;
 
@@ -3587,7 +3587,7 @@ function exportCSVRange(){
   const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`4khing_${_rptFrom}_${_rptTo}.csv`;a.click();
+  a.download=`4king77_${_rptFrom}_${_rptTo}.csv`;a.click();
   showToast('Export CSV ສຳເລັດ');
 }
 
@@ -3760,7 +3760,7 @@ function pgSettings(){
 
     <div class="card p24">
       <div class="st">ຂໍ້ມູນລະບົບ</div>
-      ${[['ລະບົບ','4Khing v3.0 (Firebase Real-Time)'],
+      ${[['ລະບົບ','4king77 v3.0 (Firebase Real-Time)'],
          ['Firebase',isFirebaseConfigured()?'🔥 ເຊື່ອມຕໍ່ແລ້ວ':'⚠ ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ'],
          ['Real-Time',isFirebaseConfigured()?'🟢 LIVE poll 2s (~100ms UX)':'🟡 Same-browser instant (BroadcastChannel)'],
          ['ພະນັກງານ',DB.employees.length+' ຄົນ'],
@@ -3807,14 +3807,14 @@ async function testFirebase(){
   if(r){ r.textContent='⏳ ກຳລັງທົດສອບ Firebase...'; r.style.color='var(--text-dim)'; }
   try{
     // Write a ping then read back
-    await fbWrite('4khing_ping', { t: Date.now() });
-    const ping = await fbRead('4khing_ping');
+    await fbWrite('4king77_ping', { t: Date.now() });
+    const ping = await fbRead('4king77_ping');
     if(ping && ping.t){
       if(r){ r.textContent='✅ Firebase ເຊື່ອມຕໍ່ສຳເລັດ! Real-Time sync ພ້ອມໃຊ້'; r.style.color='var(--green)'; }
       showSyncStatus('saved');
       showToast('🔥 Firebase ເຊື່ອມຕໍ່ສຳເລັດ — Real-Time LIVE!');
       // Push current DB to Firebase
-      await fbWrite('4khing', DB);
+      await fbWrite('4king77', DB);
       _lastSavedHash = dbHash();
       // Restart polling
       startPolling();
@@ -3836,7 +3836,7 @@ function saveSettings(){
 
 function exportAllData(){
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`4khing_backup_${today()}.json`; a.click();
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`4king77_backup_${today()}.json`; a.click();
   showToast('Export ຂໍ້ມູນສຳເລັດ');
 }
 
