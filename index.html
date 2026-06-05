@@ -670,7 +670,10 @@ const totalRevMonth = () => {
   const m = today().slice(0,7);
   return totalRev(r=>r.date.startsWith(m));
 };
-const netProfit = () => totalRevMonth() - totalExp();
+// ກຳໄລສຸດທິການຂາຍ = ສ່ວນຕ່າງ × 75% (ຫັກຄ່າຄຸ້ມຄອງ 25%)
+const salesProfit  = () => totalRevMonth() * 0.75;
+// ກຳໄລສຸດທິທັງໝົດ = ກຳໄລການຂາຍ − ລາຍຈ່າຍທັງໝົດ
+const netProfit    = () => salesProfit() - totalExp();
 const getCommTier = amt => {
   const tiers = DB.commTiers;
   for(let i=tiers.length-1;i>=0;i--){
@@ -1115,12 +1118,13 @@ function renderDashboard(){
 
   const revFiltered = DB.revenues.filter(inRange);
   const expFiltered = DB.expenses.filter(inRangeE);
-  const rev   = revFiltered.reduce((a,b)=>a+b.amount,0);
-  const exp   = expFiltered.reduce((a,b)=>a+b.amount,0);
-  const profit = rev - exp;
-  const revMonth = totalRevMonth();
-  const expAll   = totalExp();
-  const netAll   = netProfit();
+  const rev        = revFiltered.reduce((a,b)=>a+b.amount,0);
+  const exp        = expFiltered.reduce((a,b)=>a+b.amount,0);
+  const salesP     = rev * 0.75;           // ກຳໄລການຂາຍ (ສ່ວນຕ່າງ×75%)
+  const profit     = salesP - exp;         // ກຳໄລທັງໝົດ (ຫັກລາຍຈ່າຍ)
+  const revMonth   = totalRevMonth();
+  const expAll     = totalExp();
+  const netAll     = netProfit();
   const online   = DB.employees.filter(e=>e.status==='ONLINE').length;
   const mTarget  = DB.settings.monthTarget;
   const dTarget  = DB.settings.dailyTarget;
@@ -1141,9 +1145,9 @@ function renderDashboard(){
       <div class="sbar" style="color:var(--red);"></div>
     </div>
     <div class="card p20 sc"><div class="bgi">💚</div>
-      <div class="sl">ກຳໄລ (${label})</div>
+      <div class="sl">ກຳໄລທັງໝົດ (${label})</div>
       <div class="sv ${profit>=0?'tgr':'tr'}">${fmt(profit)}</div>
-      <div class="ss">${profit>=0?'✓ ກຳໄລ':'⚠ ຂາດທຶນ'}</div>
+      <div class="ss">ການຂາຍ ${fmt(salesP)} | ຫັກຈ່າຍ ${fmt(exp)}</div>
       <div class="sbar" style="color:var(--green);"></div>
     </div>
     <div class="card p20 sc"><div class="bgi">📈</div>
@@ -1159,9 +1163,9 @@ function renderDashboard(){
       <div class="sbar" style="color:var(--blue);"></div>
     </div>
     <div class="card p20 sc" style="cursor:pointer;" onclick="navigate('reserve')"><div class="bgi">🏦</div>
-      <div class="sl">ກຳໄລສຸດທິ (ເດືອນ)</div>
+      <div class="sl">ກຳໄລສຸດທິທັງໝົດ (ເດືອນ)</div>
       <div class="sv ${netAll>=0?'tgr':'tr'}">${fmt(netAll)}</div>
-      <div class="ss">ຫຼັງຫັກລາຍຈ່າຍ</div>
+      <div class="ss">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(expAll)}</div>
       <div class="sbar" style="color:var(--green);"></div>
     </div>
     <div class="card p20 sc" style="cursor:pointer;border-color:rgba(68,170,255,0.3);" onclick="navigate('reserve')"><div class="bgi">🏦</div>
@@ -1257,7 +1261,7 @@ function renderDashboard(){
     <div style="display:flex;justify-content:space-between;"><span class="td">Break Even:</span><span style="color:${netAll>=0?'var(--green)':'var(--red)'};">${netAll>=0?'✓ ຜ່ານແລ້ວ':'⚠ ຍັງຂາດ '+fmt(Math.abs(netAll))}</span></div>
     <div style="display:flex;justify-content:space-between;margin-top:6px;"><span class="td">ລາຍຮັບ (${label}):</span><span class="tg">${fmt(rev)}</span></div>
     <div style="display:flex;justify-content:space-between;margin-top:4px;"><span class="td">ລາຍຈ່າຍ (${label}):</span><span class="tr">${fmt(exp)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;"><span class="td bold">ກຳໄລ (${label}):</span><span class="${profit>=0?'tgr':'tr'} bold">${fmt(profit)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;"><span class="td bold">ກຳໄລທັງໝົດ (${label}):</span><span class="${profit>=0?'tgr':'tr'} bold">${fmt(profit)}</span></div>
   `;
 
   // ── PARTNER OVERVIEW ─────────────────────────────────────────
@@ -1344,7 +1348,7 @@ function pgRevenue(){
       <div class="card p20" style="border-left:4px solid var(--green);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📈 ກຳໄລສຸດທິ</div>
         <div style="font-size:22px;font-weight:900;color:var(--green);">₭ ${Number(netProfit()).toLocaleString()}</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ສ່ວນຕ່າງລວມ</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExp())}</div>
       </div>
       <div class="card p20" style="border-left:4px solid var(--blue);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📋 ທຸລະກຳ (ເດືອນ)</div>
@@ -1408,7 +1412,7 @@ function pgRevenue(){
           <span id="rpv-val-1" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:14px;">
-          <span style="color:var(--text-dim);">ຄ່າທຳນຽມ / ລາງວັນ</span>
+          <span style="color:var(--text-dim);">ຄ່າທຳນຽມ</span>
           <span id="rpv-val-2" style="color:var(--gold3);font-weight:700;font-size:15px;">₭0</span>
         </div>
 
@@ -1451,7 +1455,7 @@ function pgRevenue(){
       </div>
       <div class="tw">
         <table>
-          <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ລາງວັນ</th><th>Commission</th><th>ໝາຍເຫດ</th>${isAdmin?'<th></th>':''}</tr></thead>
+          <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ຄ່າທຳນຽມ</th><th>Commission</th><th>ໝາຍເຫດ</th>${isAdmin?'<th></th>':''}</tr></thead>
           <tbody id="rv-tbody"></tbody>
         </table>
       </div>
@@ -1856,7 +1860,7 @@ function pgShift(){
         <div class="fgr"><label>ລາຍຮັບ (₭)</label><input type="number" id="sq-amt" placeholder="0" min="0"></div>
         <div class="fgr"><label>ຝາກ (₭)</label><input type="number" id="sq-dep" placeholder="0" min="0"></div>
         <div class="fgr"><label>ຖອນ (₭)</label><input type="number" id="sq-wth" placeholder="0" min="0"></div>
-        <div class="fgr"><label>ລາງວັນ (₭)</label><input type="number" id="sq-prz" placeholder="0" min="0"></div>
+        <div class="fgr"><label>ຄ່າທຳນຽມ (₭)</label><input type="number" id="sq-prz" placeholder="0" min="0"></div>
         <div class="fgr"><label>ໝາຍເຫດ</label><input type="text" id="sq-nt" placeholder="ໝາຍເຫດ..."></div>
       </div>
       <button class="btn btn-gold" onclick="addQuickRev()">+ ບັນທຶກລາຍຮັບ</button>
@@ -2045,7 +2049,7 @@ function tryEndShift(){
         </div>
         <div>
           <div style="color:var(--text-faint);margin-bottom:2px;">ລາຍຮັບລວມ</div>
-          <span id="sp-rev" style="color:var(--gold);font-weight:700;">₭0</span>
+          <span id="sp-rev2" style="color:var(--gold);font-weight:700;">₭0</span>
         </div>
       </div>
     </div>
@@ -2145,7 +2149,7 @@ function exportShiftImage(shiftId){
     ['ລາຍຮັບທັງໝົດ', fmt(totalRev), '#00ff88'],
     ['ຍອດຝາກ',       fmt(totalDep), '#FFD700'],
     ['ຍອດຖອນ',       fmt(totalWith), '#ff4455'],
-    ['ລາງວັນ',       fmt(totalPrize), '#44aaff'],
+    ['ຄ່າທຳນຽມ',       fmt(totalPrize), '#44aaff'],
     ['Bonus',         fmt(totalBonus), '#cc44ff'],
     ['Commission '+tier.rate+'%', fmt(commission), '#FF8C00'],
   ];
@@ -3059,7 +3063,7 @@ function pgPartner(){
     <div class="card glow p20" style="max-width:420px;">
       <div style="display:flex;flex-direction:column;gap:8px;">
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
-          <span style="color:var(--text-dim);">ສ່ວນຕ່າງລວມ</span>
+          <span style="color:var(--text-dim);">ສ່ວນຕ່າງລວມ (ຝາກ−ຖອນ−ຄ່າທຳນຽມ)</span>
           <span class="tg bold">${fmt(totalRevMonth())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
@@ -3067,16 +3071,16 @@ function pgPartner(){
           <span class="tr bold">− ${fmt(totalExp())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
-          <span style="color:var(--text-dim);">ກຳໄລຫຼັງຈ່າຍ</span>
-          <span class="tg bold">${fmt(netProfit())}</span>
+          <span style="color:var(--text-dim);">ກຳໄລສຸດທິການຂາຍ (×75%)</span>
+          <span class="tg bold">${fmt(salesProfit())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
           <span style="color:var(--text-dim);">ຄ່າຄຸ້ມຄອງລະບົບ (25%)</span>
-          <span style="color:var(--gold3);font-weight:700;">− ${fmt(netProfit()*0.25)}</span>
+          <span style="color:var(--gold3);font-weight:700;">− ${fmt(totalRevMonth()*0.25)}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:15px;padding:8px 0;">
           <span style="font-weight:800;">ກຳໄລທີ່ແທ້ຈິງ (ແບ່ງຫຸ້ນສ່ວນ)</span>
-          <span class="tgr" style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;">${fmt(netProfit()*0.75)}</span>
+          <span class="tgr" style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;">${fmt(salesProfit())}</span>
         </div>
       </div>
     </div>
@@ -3282,7 +3286,7 @@ function pgReports(){
         </div>
         <button class="btn" onclick="applyRptRange()"
           style="background:rgba(68,170,255,0.15);border:1px solid rgba(68,170,255,0.45);color:var(--blue);border-radius:8px;padding:9px 22px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:1px;">
-          📅 ກັ່ນຕອງ
+          📅 ກົ້ນຕອງ
         </button>
       </div>
       <!-- QUICK PRESETS -->
@@ -3321,7 +3325,7 @@ function pgReports(){
     <div class="card p24">
       <div class="st">ສະຫຼຸບພະນັກງານ</div>
       <div class="tw"><table>
-        <thead><tr><th>ພະນັກງານ</th><th>Shift</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ລາງວັນ</th><th>Commission</th><th>ເງິນເດືອນ</th><th>ລວມ</th></tr></thead>
+        <thead><tr><th>ພະນັກງານ</th><th>Shift</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ຄ່າທຳນຽມ</th><th>Commission</th><th>ເງິນເດືອນ</th><th>ລວມ</th></tr></thead>
         <tbody id="rpt-emp-tbody"></tbody>
       </table></div>
       <div id="rpt-emp-sum"></div>
@@ -3334,7 +3338,7 @@ function pgReports(){
         <input class="search-box" style="width:180px;" placeholder="🔍 ຄົ້ນຫາ..." oninput="renderRptRevTable(this.value)">
       </div>
       <div class="tw"><table>
-        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ລາງວັນ</th><th>Bonus</th><th>Commission</th><th>ໝາຍເຫດ</th></tr></thead>
+        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ລາຍຮັບ</th><th>ຝາກ</th><th>ຖອນ</th><th>ຄ່າທຳນຽມ</th><th>Bonus</th><th>Commission</th><th>ໝາຍເຫດ</th></tr></thead>
         <tbody id="rpt-rev-tbody"></tbody>
       </table></div>
       <div id="rpt-rev-sum"></div>
@@ -3402,8 +3406,11 @@ function renderRptAll(){
   const prz    = revs.reduce((a,b)=>a+(b.prize||0),0);
   const bon    = revs.reduce((a,b)=>a+(b.bonus||0),0);
   const exp    = exps.reduce((a,b)=>a+b.amount,0);
-  const profit = rev - exp;
-  const comm   = revs.reduce((a,b)=>a+b.amount*getCommTier(b.amount).rate/100,0);
+  const netDiff  = dep - wit - prz;         // ສ່ວນຕ່າງ = ຝາກ−ຖອນ−ຄ່າທຳນຽມ
+  const salesP2  = netDiff * 0.75;          // ກຳໄລສຸດທິການຂາຍ (ຫັກ 25%)
+  const mgmtFee  = netDiff * 0.25;          // ຄ່າຄຸ້ມຄອງ 25%
+  const profit   = salesP2 - exp;           // ກຳໄລສຸດທິທັງໝົດ (ຫັກລາຍຈ່າຍ)
+  const comm   = revs.reduce((a,b)=>{ const n=(b.deposit||0)-(b.withdraw||0)-(b.prize||0); return a+n*getCommTier(n).rate/100; },0);
   const days   = Math.max(1,Math.round((new Date(_rptTo)-new Date(_rptFrom))/(864e5))+1);
   // unique employees who worked
   const activeEmps = new Set(revs.map(r=>r.empName));
@@ -3419,7 +3426,7 @@ function renderRptAll(){
         <span style="font-size:12px;color:var(--text-dim);">ກຳໄລສຸດທິ</span>
       </div>
       <div style="font-size:22px;font-weight:900;color:${profit>=0?'var(--green)':'var(--red)'};">₭ ${Number(profit).toLocaleString()}</div>
-      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;">ສ່ວນຕ່າງລວມ</div>
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;">ການຂາຍ: ${fmt(salesP2)} | ຫັກຈ່າຍ: −${fmt(exp)}</div>
     </div>
     <div class="card p20" style="border-left:4px solid var(--blue);">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -3457,7 +3464,7 @@ function renderRptAll(){
     ${[
       ['ຍອດຝາກ',      fmt(dep),   'var(--green)'],
       ['ຍອດຖອນ',      fmt(wit),   'var(--red)'],
-      ['ລາງວັນ',      fmt(prz),   'var(--gold3)'],
+      ['ຄ່າທຳນຽມ',      fmt(prz),   'var(--gold3)'],
       ['Bonus',        fmt(bon),   'var(--purple)'],
       ['ລາຍຮັບລວມ',   fmt(rev),   'var(--gold)'],
     ].map(([l,v,c])=>`
@@ -3465,8 +3472,24 @@ function renderRptAll(){
         <span style="color:var(--text-dim);">${l}</span>
         <span style="color:${c};font-weight:700;">${v}</span>
       </div>`).join('')}
-    <div style="display:flex;justify-content:space-between;padding:11px 12px;background:rgba(255,215,0,0.06);border-radius:8px;margin-top:8px;font-size:14px;">
-      <span style="font-weight:700;">ສ່ວນຕ່າງ</span>
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-top:8px;font-size:13px;">
+      <span style="color:var(--text-dim);">ສ່ວນຕ່າງ (ຝາກ−ຖອນ−ຄ່າທຳນຽມ)</span>
+      <span style="font-weight:700;color:${netDiff>=0?'var(--green)':'var(--red)'};">${fmt(netDiff)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-top:4px;font-size:13px;">
+      <span style="color:var(--text-dim);">ຄ່າຄຸ້ມຄອງລະບົບ (25%)</span>
+      <span style="font-weight:700;color:var(--gold3);">− ${fmt(mgmtFee)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(0,255,136,0.04);border-radius:8px;margin-top:4px;font-size:13px;border:1px solid rgba(0,255,136,0.12);">
+      <span style="font-weight:700;">ກຳໄລສຸດທິການຂາຍ</span>
+      <span style="font-weight:900;color:${salesP2>=0?'var(--green)':'var(--red)'};">${fmt(salesP2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;margin-top:4px;font-size:13px;">
+      <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍທັງໝົດ</span>
+      <span style="font-weight:700;color:var(--red);">− ${fmt(exp)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:11px 12px;background:rgba(0,255,136,0.06);border-radius:8px;margin-top:4px;font-size:14px;border:1px solid rgba(0,255,136,0.15);">
+      <span style="font-weight:800;">ກຳໄລສຸດທິທັງໝົດ</span>
       <span style="font-weight:900;color:${profit>=0?'var(--green)':'var(--red)'};">${fmt(profit)}</span>
     </div>
     <div style="display:flex;gap:20px;margin-top:10px;font-size:12px;">
@@ -3498,8 +3521,8 @@ function renderRptAll(){
           <span style="color:${p.color};font-weight:600;">${p.name} (${p.share}%)</span>
           <span style="color:${p.color};font-weight:700;">${fmt(profit*p.share/100)}</span>
         </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;padding:10px 12px;background:rgba(255,215,0,0.06);border-radius:8px;margin-top:8px;font-size:13px;">
-        <span style="font-weight:700;">ກຳໄລສຸດທິ</span>
+      <div style="display:flex;justify-content:space-between;padding:10px 12px;background:rgba(0,255,136,0.06);border-radius:8px;margin-top:8px;font-size:13px;border:1px solid rgba(0,255,136,0.15);">
+        <span style="font-weight:700;">ກຳໄລສຸດທິທັງໝົດ</span>
         <span style="font-weight:900;color:${profit>=0?'var(--green)':'var(--red)'};">${fmt(profit)}</span>
       </div>
     </div>
@@ -3597,7 +3620,7 @@ function renderRptExpTable(q){
 
 function exportCSVRange(){
   const revs=getRptRevs(), exps=getRptExps();
-  const rows=[['=== ລາຍຮັບ ==='],['ວັນທີ','ພະນັກງານ','ລາຍຮັບ','ຝາກ','ຖອນ','ລາງວັນ','Bonus','Commission','ໝາຍເຫດ']];
+  const rows=[['=== ລາຍຮັບ ==='],['ວັນທີ','ພະນັກງານ','ລາຍຮັບ','ຝາກ','ຖອນ','ຄ່າທຳນຽມ','Bonus','Commission','ໝາຍເຫດ']];
   revs.forEach(r=>{const t=getCommTier(r.amount);rows.push([r.date,r.empName,r.amount,r.deposit||0,r.withdraw||0,r.prize||0,r.bonus||0,Math.round(r.amount*t.rate/100),r.notes||'']);});
   const totRev=revs.reduce((a,b)=>a+b.amount,0);
   rows.push(['ລວມ','',totRev,'','','','','','']);rows.push([]);
