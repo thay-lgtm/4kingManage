@@ -281,7 +281,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div id="sb">
     <div class="brand">
       <div class="bi">👑</div>
-      <div><div class="bn">4king77</div><div class="bs">ສູນຄວບຄຸມ</div></div>
+      <div><div class="bn">4king77</div><div class="bs">ລະບົບຄຸ້ມຄອງ</div></div>
     </div>
     <nav id="snav"></nav>
     <div class="uinfo">
@@ -942,7 +942,7 @@ function pgDashboard(){
     <!-- HEADER + FILTER BAR -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
       <div>
-        <div class="pt">4king77 ສູນຄວບຄຸມ</div>
+        <div class="pt">4king77 ລະບົບຄຸ້ມຄອງ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -3345,7 +3345,7 @@ function pgReports(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[
           ['ມື້',       ()=>[today(),today()]],
-          ['ມານວ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
+          ['ມື້ວານ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
           ['ອາທິດນີ້', ()=>{ const d=new Date();const dow=d.getDay()===0?6:d.getDay()-1;const ws=new Date(d);ws.setDate(d.getDate()-dow);return[ws.toISOString().slice(0,10),today()]; }],
           ['ເດືອນນີ້', ()=>[today().slice(0,7)+'-01',today()]],
           ['7 ມື້',    ()=>{ const d=new Date();d.setDate(d.getDate()-6);return[d.toISOString().slice(0,10),today()]; }],
