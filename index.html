@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4Khing internet - ລະບົບຄຸ້ມຄອງ ແລະ ຕິດຕາມ</title>
+<title>4Khing - ລະບົບຄຸ້ມຄອງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -264,8 +264,11 @@ tr:hover td{background:rgba(255,215,0,0.022);}
           <input id="ip" class="lin" type="password" placeholder="ໃສ່ລະຫັດຜ່ານ" onkeydown="if(event.key==='Enter')doLogin()">
         </div>
       </div>
-      <button class="btn btn-gold lbtn" id="lbtn" onclick="doLogin()">ເຂົ້າສູ່ລະບົບ →</button>
- 
+      <button class="btn btn-gold lbtn" id="lbtn" onclick="doLogin()">ເຂົ້າລະບົບ →</button>
+      <div class="lhint">ທົດລອງ: admin / admin &nbsp;|&nbsp; staff / staff</div>
+      <div id="shift-warn" class="hidden" style="margin-top:14px;padding:10px 14px;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.35);border-radius:10px;color:#00ff88;font-size:11px;text-align:center;letter-spacing:.5px;">
+        🟢 Shift ກຳລັງດຳເນີນຢູ່ — ກະລຸນາ Login ເພື່ອສືບຕໍ່
+      </div>
 
     </div>
   </div>
@@ -278,7 +281,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div id="sb">
     <div class="brand">
       <div class="bi">👑</div>
-      <div><div class="bn">4KHING</div><div class="bs">ລະບົບຄຸ້ມຄອງ</div></div>
+      <div><div class="bn">4KHING</div><div class="bs">ສູນຄວບຄຸມ</div></div>
     </div>
     <nav id="snav"></nav>
     <div class="uinfo">
@@ -601,8 +604,40 @@ function loadDataSync(){
 }
 let DB = loadDataSync() || JSON.parse(JSON.stringify(DEFAULT));
 
-// Session (not persisted)
-let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, calcAmount:3000000, page:'dashboard' };
+// Session (not persisted) — shiftActive/shiftStart/shiftLogId ARE persisted via SHIFT_KEY
+const SHIFT_KEY = '4khing_shift_v1';
+let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, shiftLogId:null, calcAmount:3000000, page:'dashboard' };
+
+// ── Shift persistence helpers ─────────────────────────────────
+function saveShiftState(){
+  if(SESSION.shiftActive && SESSION.user){
+    localStorage.setItem(SHIFT_KEY, JSON.stringify({
+      username:    SESSION.user.username,
+      shiftStart:  SESSION.shiftStart,
+      shiftLogId:  SESSION.shiftLogId,
+    }));
+  } else {
+    localStorage.removeItem(SHIFT_KEY);
+  }
+}
+
+function loadShiftState(){
+  try{
+    const raw = localStorage.getItem(SHIFT_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  }catch(e){ return null; }
+}
+
+function restoreShiftIfNeeded(){
+  const saved = loadShiftState();
+  if(!saved) return;
+  if(saved.username !== SESSION.user.username) return; // belongs to another user
+  SESSION.shiftActive  = true;
+  SESSION.shiftStart   = saved.shiftStart;
+  SESSION.shiftLogId   = saved.shiftLogId;
+  SESSION.shiftElapsed = Math.floor((Date.now() - SESSION.shiftStart) / 1000);
+}
 
 // ============================================================
 // HELPERS
@@ -719,6 +754,7 @@ async function doLogin(){
     addLog(user.name,'ເຂົ້າສູ່ລະບົບ','login');
     buildNav();
     updateBadge();
+    restoreShiftIfNeeded(); // ກູ້ Shift ທີ່ຍັງດຳເນີນຢູ່
     navigate('dashboard');
     startPolling(); // ເລີ່ມ Real-Time sync
     // Activate RT dot
@@ -732,6 +768,12 @@ async function doLogin(){
 function showErrLogin(msg){ const e=document.getElementById('lerr'); e.textContent=msg; e.classList.remove('hidden'); }
 function doLogout(){
   if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
+  // ຖ້າ Shift ຍັງດຳເນີນ — ຢ່າລຶບ state (ຈະ restore ເມື່ອ login ກັບ)
+  if(!SESSION.shiftActive){
+    saveShiftState(); // ensures localStorage is clear
+  }
+  // snapshot elapsed so startTime can be recalculated correctly on restore
+  if(SESSION.shiftActive) saveShiftState();
   addLog(SESSION.user.name,'ອອກຈາກລະບົບ','login');
   SESSION.user=null; SESSION.shiftActive=false; SESSION.shiftElapsed=0;
   document.getElementById('lp').classList.remove('hidden');
@@ -1891,6 +1933,7 @@ function startShift(){
   DB.shiftLogs.unshift({id:SESSION.shiftLogId,date:today(),empName:SESSION.user.name,empId:SESSION.user.id,startTime:nowTime(),endTime:null,hours:null,revenue:0});
   addLog(SESSION.user.name,'ເລີ່ມ Shift','shift');
   saveData();
+  saveShiftState(); // persist across refresh/re-login
   pgShift();
 }
 
@@ -2019,7 +2062,7 @@ function submitShiftReport(){
   }
 
   // close shift log
-  const hours=SESSION.shiftElapsed/3600;
+  const hours=(SESSION.shiftElapsed || Math.floor((Date.now()-SESSION.shiftStart)/1000))/3600;
   if(SESSION.shiftLogId){
     const idx=DB.shiftLogs.findIndex(s=>s.id===SESSION.shiftLogId);
     if(idx>=0){ DB.shiftLogs[idx].endTime=nowTime(); DB.shiftLogs[idx].hours=hours; DB.shiftLogs[idx].revenue=rev; }
@@ -2031,6 +2074,7 @@ function submitShiftReport(){
 
   if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
   SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null;
+  saveShiftState(); // clear persisted shift
 
   addLog(SESSION.user.name,`ສິ້ນສຸດ Shift ລາຍຮັບ ${fmt(rev)}`,'shift');
   addNotif(`${SESSION.user.name} ປິດ Shift ລາຍຮັບ ${fmt(rev)}`,'shift');
@@ -3793,6 +3837,13 @@ function resetAll(){
 // INIT
 // ============================================================
 startClock();
+// Show shift-in-progress banner on login screen if applicable
+(function(){
+  try{
+    const s = loadShiftState();
+    if(s){ const w=document.getElementById('shift-warn'); if(w) w.classList.remove('hidden'); }
+  }catch(e){}
+})();
 document.getElementById('mover').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
 </script>
 </body>
