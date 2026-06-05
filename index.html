@@ -1094,9 +1094,9 @@ function renderDashboard(){
       <div class="sbar" style="color:var(--green);"></div>
     </div>
     <div class="card p20 sc" style="cursor:pointer;border-color:rgba(68,170,255,0.3);" onclick="navigate('reserve')"><div class="bgi">🏦</div>
-      <div class="sl">ເງິນສຳຮອງ (ຍອດສຸດທິ)</div>
+      <div class="sl">ເງິນສຳຮອງທີ່ໃຊ້ໄດ້</div>
       <div class="sv" style="color:var(--blue);">${fmt(reserveNetBalance().net)}</div>
-      <div class="ss">${Math.min(Math.round(reserveNetBalance().net/((DB.reserve||{target:1}).target||1)*100),100)}% ຂອງເປົ້າ</div>
+      <div class="ss">ຝາກ ${fmt((DB.reserve||{balance:0}).balance)} − ຈ່າຍ ${fmt(totalExp())}</div>
       <div class="sbar" style="color:var(--blue);"></div>
     </div>
   `;
@@ -2606,12 +2606,8 @@ function addExp(){
   DB.expenses.push({id:uid(),name,amount,date,category,notes});
   addLog(SESSION.user.name,`ເພີ່ມລາຍຈ່າຍ: ${name} ${fmt(amount)}`,'expense');
   // auto-notify if category is ສຳຮອງ
-  if(category==='ສຳຮອງ'){
-    const rn = reserveNetBalance();
-    showToast(`⚠ ລາຍຈ່າຍໝວດ "ສຳຮອງ" — ຍອດສຳຮອງຍັງເຫຼືອ: ${fmt(rn.net)}`,'error');
-  } else {
-    showToast('ເພີ່ມລາຍຈ່າຍສຳເລັດ');
-  }
+  const rn = reserveNetBalance();
+  showToast(`✅ ເພີ່ມລາຍຈ່າຍສຳເລັດ — ເງິນສຳຮອງຍັງໃຊ້ໄດ້: ${fmt(rn.net)}`);
   saveData();
   document.getElementById('ex-n').value=''; document.getElementById('ex-a').value=''; document.getElementById('ex-nt').value='';
   renderExpDashboard();
@@ -2696,8 +2692,8 @@ function getReserve(){
 function reserveNetBalance(){
   const r    = getReserve();
   const bal  = r.balance || 0;
-  // ລາຍຈ່າຍທີ່ register ເປັນ "ສຳຮອງ" = ໃຊ້ຈ່າຍຈາກ reserve
-  const used = DB.expenses.filter(e=>e.category==='ສຳຮອງ').reduce((a,b)=>a+b.amount, 0);
+  // ລາຍຈ່າຍທັງໝົດ — ຫັກອອກຈາກເງິນສຳຮອງ
+  const used = DB.expenses.reduce((a,b)=>a+b.amount, 0);
   return { balance: bal, used, net: bal - used };
 }
 
@@ -2723,7 +2719,7 @@ function pgReserve(){
       </div>
       <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;flex-wrap:wrap;">
         <span style="font-size:12px;color:var(--text-dim);">ຝາກທັງໝົດ: <span style="color:var(--green);font-weight:700;">${fmt(bal)}</span></span>
-        <span style="font-size:12px;color:var(--text-dim);">ໃຊ້ຈ່າຍ (ໝວດສຳຮອງ): <span style="color:var(--red);font-weight:700;">-${fmt(expUsed)}</span></span>
+        <span style="font-size:12px;color:var(--text-dim);">ລາຍຈ່າຍທັງໝົດ: <span style="color:var(--red);font-weight:700;">-${fmt(expUsed)}</span></span>
       </div>
     </div>
 
@@ -2740,9 +2736,9 @@ function pgReserve(){
         <div class="ss">${txs.filter(t=>t.type==='out').length} ລາຍການ</div>
       </div>
       <div class="card p20 sc"><div class="bgi">💳</div>
-        <div class="sl">ໃຊ້ຈ່າຍ (ໝວດສຳຮອງ)</div>
+        <div class="sl">ລາຍຈ່າຍທັງໝົດ</div>
         <div class="sv tr">${fmt(expUsed)}</div>
-        <div class="ss">${DB.expenses.filter(e=>e.category==='ສຳຮອງ').length} ລາຍການ</div>
+        <div class="ss">${DB.expenses.length} ລາຍການ</div>
       </div>
       <div class="card p20 sc"><div class="bgi">📋</div>
         <div class="sl">ທຸລະກຳທັງໝົດ</div>
