@@ -1375,7 +1375,7 @@ function pgRevenue(){
           <div class="fgr"><label>ພະນັກງານ</label>
             <select id="rv-emp">
               ${isAdmin
-                ? DB.employees.map(e=>`<option value="${e.id}" data-name="${e.name}">${e.name}</option>`).join('')
+                ? DB.employees.map(e=>`<option value="${e.id}" data-name="${e.name}">${e.name}</option>`).join('') + DB.users.filter(u=>u.role==='admin' && !DB.employees.find(e=>e.username===u.username||e.name===u.name)).map(u=>`<option value="a_${u.id}" data-name="${u.name}">${u.name} (Admin)</option>`).join('')
                 : `<option value="${SESSION.user.id}" data-name="${SESSION.user.name}">${SESSION.user.name}</option>`
               }
             </select>
