@@ -1310,60 +1310,56 @@ function pgRevenue(){
               }
             </select>
           </div>
-          <div class="fgr"><label>ລາຍຮັບ (₭)</label><input type="number" id="rv-amt" placeholder="0" min="0" oninput="updateRevPreview()"></div>
-          <div class="fgr"><label>ຝາກ (₭)</label><input type="number" id="rv-dep" placeholder="0" min="0" oninput="updateRevPreview()"></div>
-          <div class="fgr"><label>ຖອນ (₭)</label><input type="number" id="rv-wth" placeholder="0" min="0" oninput="updateRevPreview()"></div>
-          <div class="fgr"><label>ລາງວັນ (₭)</label><input type="number" id="rv-prz" placeholder="0" min="0" oninput="updateRevPreview()"></div>
-          <div class="fgr"><label>Bonus (₭)</label><input type="number" id="rv-bon" placeholder="0" min="0"></div>
-          <div class="fgr"><label>ໝາຍເຫດ</label><input type="text" id="rv-nt" placeholder="ໝາຍເຫດ..."></div>
+          <div class="fgr"><label>ຍອດຝາກ (₭)</label><input type="number" id="rv-dep" placeholder="0" min="0" oninput="updateRevPreview()"></div>
+          <div class="fgr"><label>ຍອດຖອນ (₭)</label><input type="number" id="rv-wth" placeholder="0" min="0" oninput="updateRevPreview()"></div>
+          <div class="fgr" style="grid-column:span 2;"><label>ຄ່າທຳນຽມ (₭)</label><input type="number" id="rv-prz" placeholder="0" min="0" oninput="updateRevPreview()"></div>
+          <div class="fgr" style="grid-column:span 2;"><label>ໝາຍເຫດ</label><input type="text" id="rv-nt" placeholder="ໝາຍເຫດ..."></div>
+          <!-- hidden fields ໃຊ້ໃນ addRev() -->
+          <input type="hidden" id="rv-amt" value="0">
+          <input type="hidden" id="rv-bon" value="0">
         </div>
         <button class="btn btn-gold" onclick="addRev()" style="width:100%;padding:13px;font-size:14px;">+ ບັນທຶກລາຍຮັບ</button>
       </div>
 
-      <!-- LIVE PREVIEW — BCEL Amount format -->
+      <!-- BCEL Amount format — same as shift modal -->
       <div class="card p24" id="rev-preview-card">
-        <!-- Title -->
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
-          <span style="font-size:18px;">💰</span>
-          <span style="font-size:16px;font-weight:700;">ຍອດເງິນ (Amount)</span>
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px;">
+          <span style="font-size:16px;">💰</span>
+          <span style="font-size:15px;font-weight:700;">ຍອດເງິນ (Amount)</span>
         </div>
 
-        <!-- Rows: label left, value right -->
-        <div id="rpv-row-0" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
           <span style="color:var(--text-dim);">ຍອດຝາກ</span>
           <span id="rpv-val-0" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
         </div>
-        <div id="rpv-row-1" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
           <span style="color:var(--text-dim);">ຍອດຖອນ</span>
           <span id="rpv-val-1" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
         </div>
-        <div id="rpv-row-2" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:14px;">
           <span style="color:var(--text-dim);">ຄ່າທຳນຽມ / ລາງວັນ</span>
           <span id="rpv-val-2" style="color:var(--gold3);font-weight:700;font-size:15px;">₭0</span>
         </div>
 
-        <!-- Divider line (ຄືຮູບ BCEL) -->
-        <div style="height:1.5px;background:linear-gradient(90deg,rgba(68,170,255,0.6),rgba(68,170,255,0.1));margin:4px 0 2px;border-radius:2px;"></div>
+        <div style="height:1.5px;background:linear-gradient(90deg,rgba(68,170,255,0.7),rgba(68,170,255,0.1));margin:2px 0 4px;border-radius:2px;"></div>
 
-        <!-- ສ່ວນຕ່າງ row — shaded background -->
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 14px;background:rgba(255,255,255,0.04);border-radius:8px;margin-top:4px;font-size:15px;">
-          <span style="font-weight:600;color:var(--text-dim);">ສ່ວນຕ່າງ</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(255,255,255,0.04);border-radius:8px;margin-top:4px;font-size:15px;">
+          <span style="font-weight:600;">ສ່ວນຕ່າງ</span>
           <span id="rpv-net" style="font-weight:900;color:var(--green);font-size:16px;">₭0</span>
         </div>
 
-        <!-- ຈຳນວນທຸລະກຳ footer -->
-        <div style="display:flex;gap:24px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);font-size:12px;">
+        <div style="display:flex;gap:24px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);font-size:12px;">
           <div>
-            <div style="color:var(--text-faint);margin-bottom:3px;">ທຸລະກຳຝາກ</div>
-            <span id="rpv-cnt-dep" style="color:var(--green);font-weight:700;font-size:15px;">0</span>
+            <div style="color:var(--text-faint);margin-bottom:2px;">Commission</div>
+            <span id="rpv-val-3" style="color:var(--blue);font-weight:700;">₭0</span>
           </div>
           <div>
-            <div style="color:var(--text-faint);margin-bottom:3px;">ທຸລະກຳຖອນ</div>
-            <span id="rpv-cnt-wth" style="color:var(--red);font-weight:700;font-size:15px;">0</span>
+            <div style="color:var(--text-faint);margin-bottom:2px;">ທຸລະກຳຝາກ</div>
+            <span id="rpv-cnt-dep" style="color:var(--green);font-weight:700;">0</span>
           </div>
           <div>
-            <div style="color:var(--text-faint);margin-bottom:3px;">Commission</div>
-            <span id="rpv-val-3" style="color:var(--blue);font-weight:700;font-size:13px;">₭0</span>
+            <div style="color:var(--text-faint);margin-bottom:2px;">ທຸລະກຳຖອນ</div>
+            <span id="rpv-cnt-wth" style="color:var(--red);font-weight:700;">0</span>
           </div>
         </div>
       </div>
@@ -1396,35 +1392,28 @@ function pgRevenue(){
 }
 
 function updateRevPreview(){
-  const amt = Number(document.getElementById('rv-amt')?.value)||0;
   const dep = Number(document.getElementById('rv-dep')?.value)||0;
   const wth = Number(document.getElementById('rv-wth')?.value)||0;
   const prz = Number(document.getElementById('rv-prz')?.value)||0;
-  const t   = getCommTier(amt);
-  const cm  = amt * t.rate / 100;
-  const net = dep - wth;
+  const net = dep - wth - prz;
 
-  // update rows 0=dep, 1=wth, 2=prz
   const s = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   s('rpv-val-0', fmt(dep));
   s('rpv-val-1', fmt(wth));
   s('rpv-val-2', fmt(prz));
-  s('rpv-val-3', `${fmt(cm)} (${t.rate}%)`);
 
-  // ສ່ວນຕ່າງ
   const netEl = document.getElementById('rpv-net');
-  if(netEl){
-    netEl.textContent = fmt(net);
-    netEl.style.color = net>=0 ? 'var(--green)' : 'var(--red)';
-  }
+  if(netEl){ netEl.textContent=fmt(net); netEl.style.color=net>=0?'var(--green)':'var(--red)'; }
 
-  // ຈຳນວນທຸລະກຳ
   const selDate = document.getElementById('rv-date')?.value || today();
   const dateRevs = DB.revenues.filter(r=>r.date===selDate);
   const depCnt = document.getElementById('rpv-cnt-dep');
   const wthCnt = document.getElementById('rpv-cnt-wth');
-  if(depCnt) depCnt.textContent = dateRevs.length + (amt>0?1:0);
+  if(depCnt) depCnt.textContent = dateRevs.length + (dep>0?1:0);
   if(wthCnt) wthCnt.textContent = dateRevs.filter(r=>(r.withdraw||0)>0).length + (wth>0?1:0);
+  // hide commission in footer since not used
+  const cm3 = document.getElementById('rpv-val-3');
+  if(cm3) cm3.parentElement.style.display='none';
 }
 
 function addRev(){
@@ -1432,13 +1421,13 @@ function addRev(){
   const empSel=document.getElementById('rv-emp');
   const empId=Number(empSel.value);
   const empName=empSel.options[empSel.selectedIndex].dataset.name || empSel.options[empSel.selectedIndex].text;
-  const amount=Number(document.getElementById('rv-amt').value)||0;
   const deposit=Number(document.getElementById('rv-dep').value)||0;
   const withdraw=Number(document.getElementById('rv-wth').value)||0;
   const prize=Number(document.getElementById('rv-prz').value)||0;
-  const bonus=Number(document.getElementById('rv-bon').value)||0;
+  const bonus=0;
+  const amount=deposit; // ລາຍຮັບ = ຍອດຝາກ
   const notes=document.getElementById('rv-nt').value;
-  if(!amount){ showToast('ກະລຸນາໃສ່ຈຳນວນລາຍຮັບ','error'); return; }
+  if(!deposit){ showToast('ກະລຸນາໃສ່ຍອດຝາກ','error'); return; }
   DB.revenues.unshift({id:uid(),date,empId,empName,amount,deposit,withdraw,prize,bonus,notes,shiftReport:false});
   addLog(SESSION.user.name,`ບັນທຶກລາຍຮັບ ${fmt(amount)} (${empName})`, 'revenue');
   addNotif(`${empName} ບັນທຶກລາຍຮັບ ${fmt(amount)}`,'revenue');
@@ -1927,12 +1916,13 @@ function tryEndShift(){
 
     <!-- INPUT GRID -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div class="fgr"><label>ລາຍຮັບທັງໝົດ (₭)</label><input id="sr-r" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
-      <div class="fgr"><label>ຍອດຝາກ (₭)</label><input id="sr-d" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
+      <div class="fgr"><label>ຍອດເຕີມ (₭)</label><input id="sr-d" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
       <div class="fgr"><label>ຍອດຖອນ (₭)</label><input id="sr-w" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
-      <div class="fgr"><label>ລາງວັນ (₭)</label><input id="sr-p" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
-      <div class="fgr"><label>Bonus (₭)</label><input id="sr-b" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
-      <div class="fgr"><label>ຍອດຄົງເຫຼືອ (₭)</label><input id="sr-bl" type="number" placeholder="0" min="0"></div>
+      <div class="fgr"><label>ກຳໄລ (₭)</label><input id="sr-r" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
+      <div class="fgr"><label>ຄ່າທຳນຽມ (₭)</label><input id="sr-p" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
+      <!-- hidden -->
+      <input type="hidden" id="sr-b" value="0">
+      <input type="hidden" id="sr-bl" value="0">
     </div>
 
     <!-- BCEL Amount format -->
@@ -1943,9 +1933,9 @@ function tryEndShift(){
         <span style="font-size:15px;font-weight:700;">ຍອດເງິນ (Amount)</span>
       </div>
 
-      <!-- ຍອດຝາກ -->
+      <!-- ຍອດເຕີມ -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
-        <span style="color:var(--text-dim);">ຍອດຝາກ</span>
+        <span style="color:var(--text-dim);">ຍອດເຕີມ</span>
         <span id="sp-dep" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
       </div>
       <!-- ຍອດຖອນ -->
@@ -1953,9 +1943,14 @@ function tryEndShift(){
         <span style="color:var(--text-dim);">ຍອດຖອນ</span>
         <span id="sp-wth" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
       </div>
-      <!-- ຄ່າທຳນຽມ/ລາງວັນ -->
+      <!-- ກຳໄລ -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <span style="color:var(--text-dim);">ກຳໄລ</span>
+        <span id="sp-rev" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
+      </div>
+      <!-- ຄ່າທຳນຽມ -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:14px;">
-        <span style="color:var(--text-dim);">ຄ່າທຳນຽມ / ລາງວັນ</span>
+        <span style="color:var(--text-dim);">ຄ່າທຳນຽມ</span>
         <span id="sp-prz" style="color:var(--gold3);font-weight:700;font-size:15px;">₭0</span>
       </div>
 
@@ -1989,30 +1984,38 @@ function tryEndShift(){
 }
 
 function updateShiftPreview(){
-  const rev = Number(document.getElementById('sr-r')?.value)||0;
-  const dep = Number(document.getElementById('sr-d')?.value)||0;
-  const wth = Number(document.getElementById('sr-w')?.value)||0;
-  const prz = Number(document.getElementById('sr-p')?.value)||0;
-  const t   = getCommTier(rev);
-  const cm  = rev * t.rate / 100;
-  const net = dep - wth;
-  const map = {'sp-dep':fmt(dep),'sp-wth':fmt(wth),'sp-prz':fmt(prz),'sp-comm':`${fmt(cm)} (${t.rate}%)`,'sp-rev':fmt(rev)};
-  Object.entries(map).forEach(([id,v])=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
-  const ne=document.getElementById('sp-net');
+  const dep = Number(document.getElementById('sr-d')?.value)||0;  // ຍອດເຕີມ
+  const wth = Number(document.getElementById('sr-w')?.value)||0;  // ຍອດຖອນ
+  const rev = Number(document.getElementById('sr-r')?.value)||0;  // ກຳໄລ
+  const prz = Number(document.getElementById('sr-p')?.value)||0;  // ຄ່າທຳນຽມ
+  const net = dep - wth - prz;
+
+  const s = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  s('sp-dep',  fmt(dep));
+  s('sp-wth',  fmt(wth));
+  s('sp-rev',  fmt(rev));
+  s('sp-prz',  fmt(prz));
+
+  const ne = document.getElementById('sp-net');
   if(ne){ ne.textContent=fmt(net); ne.style.color=net>=0?'var(--green)':'var(--red)'; }
+
+  // hide commission footer item
+  const cm = document.getElementById('sp-comm');
+  if(cm) cm.parentElement.style.display='none';
 }
 
 function submitShiftReport(){
-  const rev=Number(document.getElementById('sr-r').value)||0;
-  const dep=Number(document.getElementById('sr-d').value)||0;
-  const wth=Number(document.getElementById('sr-w').value)||0;
-  const prz=Number(document.getElementById('sr-p').value)||0;
-  const bon=Number(document.getElementById('sr-b').value)||0;
+  const dep=Number(document.getElementById('sr-d').value)||0;   // ຍອດເຕີມ
+  const wth=Number(document.getElementById('sr-w').value)||0;   // ຍອດຖອນ
+  const rev=Number(document.getElementById('sr-r').value)||0;   // ກຳໄລ
+  const prz=Number(document.getElementById('sr-p').value)||0;   // ຄ່າທຳນຽມ
+  const bon=0;
   const notes=document.getElementById('sr-n').value;
+  const amount=dep; // ລາຍຮັບຫຼັກ = ຍອດເຕີມ
 
   // add revenue entry
-  if(rev>0){
-    DB.revenues.unshift({id:uid(),date:today(),empId:SESSION.user.id,empName:SESSION.user.name,amount:rev,deposit:dep,withdraw:wth,prize:prz,bonus:bon,notes:notes||'ລາຍງານ Shift',shiftReport:true});
+  if(dep>0||rev>0){
+    DB.revenues.unshift({id:uid(),date:today(),empId:SESSION.user.id,empName:SESSION.user.name,amount:amount,deposit:dep,withdraw:wth,prize:prz,bonus:bon,notes:notes||'ລາຍງານ Shift',shiftReport:true});
   }
 
   // close shift log
