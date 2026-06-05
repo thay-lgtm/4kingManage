@@ -945,7 +945,7 @@ function pgDashboard(){
     <!-- PILL FILTER BAR -->
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.14);border-radius:12px;padding:10px 14px;">
       <span style="font-size:10px;color:var(--text-faint);letter-spacing:1px;margin-right:4px;">FILTER</span>
-      ${[['all','ທ້ອງໝົດ'],['day','ມື້'],['week','ອາທິດ'],['month','ເດືອນ']].map(([k,l])=>`
+      ${[['all','ທັງໝົດ'],['day','ມື້'],['week','ອາທິດ'],['month','ເດືອນ']].map(([k,l])=>`
         <button id="dbtab-${k}" onclick="setDbPeriod('${k}')"
           style="border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid rgba(255,215,0,0.3);
           background:${_dbPeriod===k?'var(--gold)':'rgba(255,215,0,0.07)'};
@@ -1079,7 +1079,7 @@ function getDbRange(){
   if(_dbPeriod==='all'){
     const allDates = [...DB.revenues.map(r=>r.date||td),...DB.expenses.map(e=>e.date||td)].filter(Boolean).sort();
     const from = allDates[0] || td.slice(0,4)+'-01-01';
-    return {from, to:td, label:'ທ້ອງໝົດ'};
+    return {from, to:td, label:'ທັງໝົດ'};
   }
   if(_dbPeriod==='day'){
     const d  = _dbDaySelect || td;
