@@ -631,12 +631,22 @@ function loadShiftState(){
 
 function restoreShiftIfNeeded(){
   const saved = loadShiftState();
-  if(!saved) return;
-  if(saved.username !== SESSION.user.username) return; // belongs to another user
+  console.log('[SHIFT RESTORE] saved state:', saved);
+  if(!saved){ console.log('[SHIFT RESTORE] no saved state'); return; }
+  if(saved.username !== SESSION.user.username){
+    console.log('[SHIFT RESTORE] username mismatch:', saved.username, '!=', SESSION.user.username);
+    return;
+  }
+  const start = Number(saved.shiftStart);
+  if(!start){ console.log('[SHIFT RESTORE] invalid start time'); return; }
   SESSION.shiftActive  = true;
-  SESSION.shiftStart   = saved.shiftStart;
-  SESSION.shiftLogId   = saved.shiftLogId;
-  SESSION.shiftElapsed = Math.floor((Date.now() - SESSION.shiftStart) / 1000);
+  SESSION.shiftStart   = start;
+  SESSION.shiftLogId   = saved.shiftLogId || null;
+  SESSION.shiftElapsed = Math.floor((Date.now() - start) / 1000);
+  console.log('[SHIFT RESTORE] success! elapsed:', SESSION.shiftElapsed, 's');
+  // ໝັ້ນໃຈ employee status = ONLINE
+  const e = DB.employees.find(x=>x.username===SESSION.user.username||x.name===SESSION.user.name);
+  if(e && e.status!=='ONLINE'){ e.status='ONLINE'; saveData(); }
 }
 
 // ============================================================
@@ -768,19 +778,37 @@ async function doLogin(){
 function showErrLogin(msg){ const e=document.getElementById('lerr'); e.textContent=msg; e.classList.remove('hidden'); }
 function doLogout(){
   if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
-  // ຖ້າ Shift ຍັງດຳເນີນ — ຢ່າລຶບ state (ຈະ restore ເມື່ອ login ກັບ)
-  if(!SESSION.shiftActive){
-    saveShiftState(); // ensures localStorage is clear
+
+  // ⚠ ບັນທຶກ shift state ກ່ອນລ້າງ SESSION
+  // ຖ້າ Shift ຍັງດຳເນີນ → save ໄວ້ໃຫ້ restore ຕອນ login ກັບ
+  // ຖ້າ Shift ບໍ່ໄດ້ດຳເນີນ → ລຶບ key ອອກ
+  if(SESSION.shiftActive && SESSION.user){
+    const shiftData = {
+      username:   SESSION.user.username,
+      shiftStart: SESSION.shiftStart,
+      shiftLogId: SESSION.shiftLogId,
+    };
+    localStorage.setItem(SHIFT_KEY, JSON.stringify(shiftData));
+    console.log('[SHIFT SAVE on logout]', shiftData);
+  } else {
+    localStorage.removeItem(SHIFT_KEY);
+    console.log('[SHIFT SAVE on logout] shift not active, cleared');
   }
-  // snapshot elapsed so startTime can be recalculated correctly on restore
-  if(SESSION.shiftActive) saveShiftState();
+
   addLog(SESSION.user.name,'ອອກຈາກລະບົບ','login');
-  SESSION.user=null; SESSION.shiftActive=false; SESSION.shiftElapsed=0;
+  SESSION.user=null;
+  SESSION.shiftActive=false;
+  SESSION.shiftElapsed=0;
+  SESSION.shiftInterval=null;
+  SESSION.shiftLogId=null;
   document.getElementById('lp').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
   document.getElementById('iu').value='';
   document.getElementById('ip').value='';
   document.getElementById('lerr').classList.add('hidden');
+  // ສະແດງ banner ຖ້າ shift ຍັງດຳເນີນ
+  const sw = document.getElementById('shift-warn');
+  if(sw){ sw.classList.toggle('hidden', !loadShiftState()); }
 }
 
 // ============================================================
