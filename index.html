@@ -468,17 +468,25 @@ async function pollFirebase() {
 // LOAD DATA
 // ============================================================
 async function loadData() {
-  try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e) {}
-  if (!isFirebaseConfigured()) return null;
-  try {
-    showSyncStatus('loading');
-    const data = await fbRead('4khing');
-    if (data) {
-      localStorage.setItem(SK, JSON.stringify(data));
-      showSyncStatus('saved');
-      return data;
+  // ດຶງ Firebase ກ່ອນສະເໝີ (ຮັບປະກັນ users/passwords ລ່າສຸດ)
+  if (isFirebaseConfigured()) {
+    try {
+      showSyncStatus('loading');
+      const data = await fbRead('4khing');
+      if (data) {
+        localStorage.setItem(SK, JSON.stringify(data));
+        showSyncStatus('saved');
+        return data;
+      }
+    } catch(e) {
+      showSyncStatus('error');
+      // Fallback to localStorage if Firebase fails
+      try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e2) {}
     }
-  } catch(e) { showSyncStatus('error'); }
+    return null;
+  }
+  // ບໍ່ມີ Firebase — ໃຊ້ localStorage
+  try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e) {}
   return null;
 }
 
@@ -678,11 +686,16 @@ async function doLogin(){
   const p=document.getElementById('ip').value.trim();
   const btn=document.getElementById('lbtn');
   if(!u||!p){ showErrLogin('ກະລຸນາໃສ່ຊື່ຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານ'); return; }
-  btn.textContent='ກຳລັງດຶງຂໍ້ມູນ cloud...'; btn.disabled=true;
+  btn.textContent='⏳ ກຳລັງດຶງຂໍ້ມູນ Firebase...'; btn.disabled=true;
 
-  // ດຶງຂໍ້ມູນລ່າສຸດຈາກ cloud ກ່ອນ login
-  const fresh = await loadData();
-  if(fresh) Object.assign(DB, fresh);
+  // ດຶງຂໍ້ມູນລ່າສຸດຈາກ Firebase ກ່ອນ login ສະເໝີ
+  try {
+    const fresh = await loadData();
+    if(fresh) {
+      Object.assign(DB, fresh);
+      _lastSavedHash = dbHash();
+    }
+  } catch(e) { /* ໃຊ້ຂໍ້ມູນ local ຖ້າ Firebase ລ້ມ */ }
 
   const user = DB.users.find(x=>x.username===u && x.password===p);
   if(user){
