@@ -836,113 +836,306 @@ function statusBadge(s){
 function scoreColor(s){ return s>=80?'#00ff88':s>=60?'#FFD700':'#ff4455'; }
 
 // ============================================================
+// ============================================================
 // PAGE: DASHBOARD
 // ============================================================
+let _dbPeriod = 'week'; // day | week | month
+
 function pgDashboard(){
-  const rev=totalRevToday(), revM=totalRevMonth(), exp=totalExp(), profit=netProfit();
-  const online=DB.employees.filter(e=>e.status==='ONLINE').length;
-  const mTarget=DB.settings.monthTarget;
-  const now=new Date(), dStr=`${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
-
-  // weekly chart data (last 7 days from revenues)
-  const days=['ອາ.','ຈ.','ອ.','ພ.','ພຫ.','ສ.','ເສ.'];
-  const weekly=[];
-  for(let i=6;i>=0;i--){
-    const d=new Date(); d.setDate(d.getDate()-i);
-    const ds=d.toISOString().slice(0,10);
-    const v=totalRev(r=>r.date===ds);
-    weekly.push({l:days[d.getDay()],v});
-  }
-
+  const now = new Date();
+  const dStr = `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
   document.getElementById('ct').innerHTML=`
   <div class="g20 ai">
-    <div class="ph">
+
+    <!-- HEADER + PERIOD TABS -->
+    <div class="ph" style="flex-wrap:wrap;gap:12px;">
       <div>
         <div class="pt">4KHING ສູນຄວບຄຸມ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
-      <div style="text-align:right;">
-        <div class="lc" id="dclk"></div>
-        <div style="color:var(--text-faint);font-size:10px;margin-top:2px;">${dStr}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;gap:5px;">
+          ${[['day','ມື້ນີ້'],['week','ອາທິດ'],['month','ເດືອນ']].map(([k,l])=>`
+          <button id="dbtab-${k}" onclick="setDbPeriod('${k}')"
+            class="btn ${_dbPeriod===k?'btn-gold':'btn-outline'}"
+            style="font-size:11px;padding:6px 14px;">${l}</button>`).join('')}
+        </div>
+        <div class="lc" id="dclk" style="font-size:12px;"></div>
+        <div style="color:var(--text-faint);font-size:10px;">${dStr}</div>
       </div>
     </div>
 
-    <div class="sgrid">
-      <div class="card glow p20 sc"><div class="bgi">💰</div><div class="sl">ລາຍຮັບມື້ນີ້</div><div class="sv tg">${fmt(rev)}</div><div class="ss">↑ ລວມທຸກ Shift</div><div class="sbar" style="color:var(--gold);"></div></div>
-      <div class="card p20 sc"><div class="bgi">📈</div><div class="sl">ລາຍຮັບເດືອນນີ້</div><div class="sv tg">${fmt(revM)}</div><div class="ss">${DB.revenues.filter(r=>r.date.startsWith(today().slice(0,7))).length} ລາຍການ</div><div class="sbar" style="color:var(--gold);"></div></div>
-      <div class="card p20 sc"><div class="bgi">💚</div><div class="sl">ກຳໄລສຸດທິ</div><div class="sv ${profit>=0?'tgr':'tr'}">${fmt(profit)}</div><div class="ss">ຫຼັງຫັກລາຍຈ່າຍ</div><div class="sbar" style="color:var(--green);"></div></div>
-      <div class="card p20 sc"><div class="bgi">💸</div><div class="sl">ລາຍຈ່າຍທັງໝົດ</div><div class="sv tr">${fmt(exp)}</div><div class="ss">${DB.expenses.length} ລາຍການ</div><div class="sbar" style="color:var(--red);"></div></div>
-      <div class="card p20 sc"><div class="bgi">👥</div><div class="sl">ພະນັກງານ Online</div><div class="sv" style="color:var(--blue);">${online} / ${DB.employees.length}</div><div class="ss">ກຳລັງເຮັດວຽກ</div><div class="sbar" style="color:var(--blue);"></div></div>
-      <div class="card p20 sc"><div class="bgi">🎯</div><div class="sl">ເປົ້າໝາຍເດືອນ</div><div class="sv" style="color:var(--purple);">${Math.min(Math.round(revM/mTarget*100),999)}%</div><div class="ss">${fmt(revM)} / ${fmt(mTarget)}</div><div class="sbar" style="color:var(--purple);"></div></div>
-    </div>
+    <!-- STAT CARDS -->
+    <div class="sgrid" id="db-stats"></div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <!-- CHARTS ROW -->
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:16px;">
       <div class="card p24">
-        <div class="st">ລາຍຮັບ 7 ວັນຜ່ານມາ</div>
-        ${barChartHTML(weekly)}
-        <div style="display:flex;justify-content:space-between;margin-top:10px;">
-          ${weekly.map(d=>`<div style="flex:1;text-align:center;"><div class="fm" style="color:var(--gold);font-size:8px;">${d.v>0?(d.v/1000000).toFixed(1)+'M':''}</div></div>`).join('')}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div class="st" style="margin:0;" id="db-chart-title">ລາຍຮັບ vs ລາຍຈ່າຍ</div>
         </div>
+        <div id="db-bar-wrap"></div>
       </div>
       <div class="card p24">
         <div class="st">ຄວາມຄືບໜ້າ</div>
-        <div class="rrow">
-          ${ringHTML(revM,mTarget,88,'ເດືອນ','#FFD700')}
-          ${ringHTML(rev,DB.settings.dailyTarget,88,'ມື້ນີ້','#00ff88')}
-          ${ringHTML(Math.max(profit,0),Math.max(exp,1),88,'ກຳໄລ','#FF8C00')}
-        </div>
+        <div id="db-rings"></div>
         <div class="sep" style="margin:12px 0;"></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;">
-          <span class="td">Break Even:</span>
-          <span style="color:${profit>=0?'var(--green)':'var(--red)'};">${profit>=0?'✓ ຜ່ານແລ້ວ':'⚠ ຍັງຂາດ '+fmt(Math.abs(profit))}</span>
-        </div>
+        <div id="db-breakeven" style="font-size:12px;"></div>
       </div>
     </div>
 
+    <!-- PARTNER OVERVIEW (ທຸກ role ເຫັນ) -->
+    <div class="card p24" id="db-partner-card"></div>
+
+    <!-- BOTTOM ROW -->
     <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;">
       <div class="card p24">
         <div class="st">ສະຖານະພະນັກງານ Live</div>
-        <div class="g12">
-          ${DB.employees.length===0?`<div class="empty"><div class="eicon">👥</div><p>ຍັງບໍ່ມີພະນັກງານ</p></div>`:''}
-          ${DB.employees.map(e=>`
-          <div style="display:flex;align-items:center;gap:13px;padding:12px 15px;background:rgba(255,255,255,0.025);border-radius:10px;border:1px solid rgba(255,215,0,0.06);">
-            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1c1800,#120f00);border:2px solid rgba(255,215,0,0.22);display:flex;align-items:center;justify-content:center;font-size:17px;">👤</div>
-            <div style="flex:1;">
-              <div style="font-weight:700;font-size:14px;">${e.name}</div>
-              <div class="td" style="font-size:11px;">Shift: ${e.shift}</div>
-            </div>
-            <div style="text-align:right;">
-              ${statusBadge(e.status)}
-              <div class="td" style="font-size:10px;margin-top:4px;">ຄະແນນ: ${e.score}</div>
-            </div>
-          </div>`).join('')}
-        </div>
+        <div class="g12" id="db-emp-list"></div>
       </div>
       <div class="card p24">
         <div class="st">ກິດຈະກຳຫຼ້າສຸດ</div>
-        <div class="g12">
-          ${DB.actLogs.slice(0,6).map(l=>`
-          <div style="display:flex;gap:9px;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,0.04);">
-            <div class="fm" style="color:rgba(255,215,0,0.5);font-size:10px;min-width:34px;">${l.time}</div>
-            <div style="font-size:12px;"><span class="tg bold">${l.user}</span><span class="td"> — ${l.action}</span></div>
-          </div>`).join('')}
-        </div>
+        <div class="g12" id="db-logs"></div>
       </div>
     </div>
 
-    <div class="card p24">
-      <div class="st">ສ່ວນແບ່ງກຳໄລຫຸ້ນສ່ວນ — ກຳໄລສຸດທິ: ${fmt(profit)}</div>
-      <div class="pgrid">
-        ${DB.partners.map(p=>`
-        <div class="card p20" style="text-align:center;border-color:${p.color}22;">
-          <div style="color:${p.color};font-size:26px;font-family:'Orbitron',monospace;font-weight:900;text-shadow:0 0 10px ${p.color};">${p.share}%</div>
-          <div style="font-weight:700;margin:4px 0;font-size:14px;">${p.name}</div>
-          <div style="color:${p.color};font-size:13px;font-weight:700;">${fmt(profit*p.share/100)}</div>
-        </div>`).join('')}
+  </div>`;
+  renderDashboard();
+}
+
+function setDbPeriod(p){
+  _dbPeriod = p;
+  ['day','week','month'].forEach(k=>{
+    const el = document.getElementById('dbtab-'+k);
+    if(!el) return;
+    el.className = 'btn '+(k===p?'btn-gold':'btn-outline');
+    el.style.cssText = 'font-size:11px;padding:6px 14px;';
+  });
+  renderDashboard();
+}
+
+function getDbRange(){
+  const td = today();
+  const now = new Date();
+  if(_dbPeriod==='day') return {from:td, to:td, label:'ມື້ນີ້'};
+  if(_dbPeriod==='week'){
+    const dow = now.getDay()===0?6:now.getDay()-1;
+    const ws = new Date(now); ws.setDate(now.getDate()-dow);
+    return {from:ws.toISOString().slice(0,10), to:td, label:'ອາທິດນີ້'};
+  }
+  return {from:td.slice(0,7)+'-01', to:td, label:'ເດືອນນີ້'};
+}
+
+function renderDashboard(){
+  const {from, to, label} = getDbRange();
+  const inRange = r => (r.date||'') >= from && (r.date||'') <= to;
+  const inRangeE = e => (e.date||'') >= from && (e.date||'') <= to;
+
+  const revFiltered = DB.revenues.filter(inRange);
+  const expFiltered = DB.expenses.filter(inRangeE);
+  const rev   = revFiltered.reduce((a,b)=>a+b.amount,0);
+  const exp   = expFiltered.reduce((a,b)=>a+b.amount,0);
+  const profit = rev - exp;
+  const revMonth = totalRevMonth();
+  const expAll   = totalExp();
+  const netAll   = netProfit();
+  const online   = DB.employees.filter(e=>e.status==='ONLINE').length;
+  const mTarget  = DB.settings.monthTarget;
+  const dTarget  = DB.settings.dailyTarget;
+
+  // ── STAT CARDS ──────────────────────────────────────────────
+  const sc = document.getElementById('db-stats');
+  if(sc) sc.innerHTML=`
+    <div class="card glow p20 sc"><div class="bgi">💰</div>
+      <div class="sl">ລາຍຮັບ (${label})</div>
+      <div class="sv tg">${fmt(rev)}</div>
+      <div class="ss">${revFiltered.length} ລາຍການ</div>
+      <div class="sbar" style="color:var(--gold);"></div>
+    </div>
+    <div class="card p20 sc"><div class="bgi">💸</div>
+      <div class="sl">ລາຍຈ່າຍ (${label})</div>
+      <div class="sv tr">${fmt(exp)}</div>
+      <div class="ss">${expFiltered.length} ລາຍການ</div>
+      <div class="sbar" style="color:var(--red);"></div>
+    </div>
+    <div class="card p20 sc"><div class="bgi">💚</div>
+      <div class="sl">ກຳໄລ (${label})</div>
+      <div class="sv ${profit>=0?'tgr':'tr'}">${fmt(profit)}</div>
+      <div class="ss">${profit>=0?'✓ ກຳໄລ':'⚠ ຂາດທຶນ'}</div>
+      <div class="sbar" style="color:var(--green);"></div>
+    </div>
+    <div class="card p20 sc"><div class="bgi">📈</div>
+      <div class="sl">ລາຍຮັບເດືອນນີ້</div>
+      <div class="sv tg">${fmt(revMonth)}</div>
+      <div class="ss">${Math.min(Math.round(revMonth/mTarget*100),999)}% ຂອງເປົ້າ</div>
+      <div class="sbar" style="color:var(--gold);"></div>
+    </div>
+    <div class="card p20 sc"><div class="bgi">👥</div>
+      <div class="sl">ພະນັກງານ Online</div>
+      <div class="sv" style="color:var(--blue);">${online} / ${DB.employees.length}</div>
+      <div class="ss">ກຳລັງເຮັດວຽກ</div>
+      <div class="sbar" style="color:var(--blue);"></div>
+    </div>
+    <div class="card p20 sc"><div class="bgi">🏦</div>
+      <div class="sl">ກຳໄລສຸດທິ (ເດືອນ)</div>
+      <div class="sv ${netAll>=0?'tgr':'tr'}">${fmt(netAll)}</div>
+      <div class="ss">ຫຼັງຫັກລາຍຈ່າຍ</div>
+      <div class="sbar" style="color:var(--green);"></div>
+    </div>
+  `;
+
+  // ── BAR CHART (Rev vs Exp) ───────────────────────────────────
+  const barWrap = document.getElementById('db-bar-wrap');
+  const title   = document.getElementById('db-chart-title');
+  if(barWrap){
+    let groups = [];
+    if(_dbPeriod==='day'){
+      // hourly buckets 0–23 grouped by 3h
+      const buckets = ['00–05','06–11','12–17','18–23'];
+      groups = buckets.map((l,i)=>({l, rev:0, exp:0}));
+      revFiltered.forEach(r=>{ /* no hour data — just show by employee */ });
+      // show by employee instead
+      const empMap={};
+      revFiltered.forEach(r=>{ empMap[r.empName]=(empMap[r.empName]||0)+r.amount; });
+      expFiltered.forEach(e=>{ /* lump as 'ລາຍຈ່າຍ' */ });
+      const empEntries = Object.entries(empMap);
+      const expTotal = expFiltered.reduce((a,b)=>a+b.amount,0);
+      const allEntries = [...empEntries.map(([n,v])=>({l:n,rev:v,exp:0}))];
+      if(expTotal>0) allEntries.push({l:'ລາຍຈ່າຍ',rev:0,exp:expTotal});
+      groups = allEntries.length>0 ? allEntries : [{l:'ບໍ່ມີ',rev:0,exp:0}];
+    } else if(_dbPeriod==='week'){
+      const days=['ຈ','ອ','ພ','ພຫ','ສ','ເສ','ອາ'];
+      const now2=new Date();
+      for(let i=0;i<7;i++){
+        const d=new Date(from); d.setDate(d.getDate()+i);
+        if(d>now2) break;
+        const ds=d.toISOString().slice(0,10);
+        const dow=d.getDay()===0?6:d.getDay()-1;
+        const rv=DB.revenues.filter(r=>r.date===ds).reduce((a,b)=>a+b.amount,0);
+        const ex=DB.expenses.filter(e=>e.date===ds).reduce((a,b)=>a+b.amount,0);
+        groups.push({l:days[dow],rev:rv,exp:ex});
+      }
+    } else {
+      // month — group by week
+      for(let w=1;w<=5;w++){
+        const wStart=new Date(from); wStart.setDate((w-1)*7+1);
+        const wEnd=new Date(from); wEnd.setDate(w*7);
+        const ws=wStart.toISOString().slice(0,10);
+        const we=wEnd.toISOString().slice(0,10);
+        const rv=DB.revenues.filter(r=>r.date>=ws&&r.date<=we&&r.date.startsWith(from.slice(0,7))).reduce((a,b)=>a+b.amount,0);
+        const ex=DB.expenses.filter(e=>e.date>=ws&&e.date<=we&&e.date.startsWith(from.slice(0,7))).reduce((a,b)=>a+b.amount,0);
+        if(rv>0||ex>0) groups.push({l:'W'+w,rev:rv,exp:ex});
+      }
+    }
+
+    const maxV = Math.max(...groups.map(g=>Math.max(g.rev,g.exp)),1);
+    const H=90;
+    barWrap.innerHTML=`
+    <div style="display:flex;align-items:flex-end;gap:6px;height:${H+30}px;padding-bottom:22px;position:relative;">
+      <!-- Y axis line -->
+      <div style="position:absolute;left:0;top:0;bottom:22px;width:1px;background:rgba(255,255,255,0.06);"></div>
+      ${groups.map(g=>`
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;height:${H+22}px;justify-content:flex-end;">
+        <div style="width:100%;display:flex;gap:2px;align-items:flex-end;height:${H}px;">
+          <div style="flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#FFD700,#FF8C00);min-height:2px;height:${Math.max(2,(g.rev/maxV)*H)}px;box-shadow:0 0 6px rgba(255,215,0,0.3);transition:height .4s;position:relative;" title="${fmt(g.rev)}">
+            ${g.rev>0?`<div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--gold);white-space:nowrap;">${(g.rev/1000000).toFixed(1)}M</div>`:''}
+          </div>
+          <div style="flex:1;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#ff4455,#cc2233);min-height:2px;height:${Math.max(2,(g.exp/maxV)*H)}px;box-shadow:0 0 6px rgba(255,68,85,0.3);transition:height .4s;position:relative;" title="${fmt(g.exp)}">
+            ${g.exp>0?`<div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--red);white-space:nowrap;">${(g.exp/1000000).toFixed(1)}M</div>`:''}
+          </div>
+        </div>
+        <div style="font-size:9px;color:var(--text-faint);margin-top:3px;">${g.l}</div>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;gap:14px;margin-top:4px;">
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);">
+        <div style="width:10px;height:10px;border-radius:2px;background:var(--gold);"></div>ລາຍຮັບ
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim);">
+        <div style="width:10px;height:10px;border-radius:2px;background:var(--red);"></div>ລາຍຈ່າຍ
+      </div>
+    </div>`;
+  }
+
+  // ── RINGS ────────────────────────────────────────────────────
+  const rings = document.getElementById('db-rings');
+  if(rings) rings.innerHTML=`<div class="rrow">
+    ${ringHTML(revMonth,mTarget,84,'ເດືອນ','#FFD700')}
+    ${ringHTML(rev,_dbPeriod==='day'?dTarget:_dbPeriod==='week'?dTarget*7:mTarget,84,label,'#00ff88')}
+    ${ringHTML(Math.max(netAll,0),Math.max(expAll,1),84,'ກຳໄລ','#FF8C00')}
+  </div>`;
+  const be = document.getElementById('db-breakeven');
+  if(be) be.innerHTML=`
+    <div style="display:flex;justify-content:space-between;"><span class="td">Break Even:</span><span style="color:${netAll>=0?'var(--green)':'var(--red)'};">${netAll>=0?'✓ ຜ່ານແລ້ວ':'⚠ ຍັງຂາດ '+fmt(Math.abs(netAll))}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:6px;"><span class="td">ລາຍຮັບ (${label}):</span><span class="tg">${fmt(rev)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;"><span class="td">ລາຍຈ່າຍ (${label}):</span><span class="tr">${fmt(exp)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;border-top:1px solid rgba(255,255,255,0.06);padding-top:6px;"><span class="td bold">ກຳໄລ (${label}):</span><span class="${profit>=0?'tgr':'tr'} bold">${fmt(profit)}</span></div>
+  `;
+
+  // ── PARTNER OVERVIEW ─────────────────────────────────────────
+  const pc = document.getElementById('db-partner-card');
+  if(pc){
+    const profitAll = netAll;
+    const totalShare = DB.partners.reduce((a,b)=>a+b.share,0);
+    pc.innerHTML=`
+    <div class="st">👑 ສ່ວນແບ່ງຫຸ້ນສ່ວນ — ກຳໄລສຸດທິ (ເດືອນ): <span class="${profitAll>=0?'tgr':'tr'}">${fmt(profitAll)}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:14px;">
+      ${DB.partners.map(p=>{
+        const amt = profitAll*p.share/100;
+        const pct = p.share;
+        return `<div style="padding:16px;border-radius:10px;background:${p.color}08;border:1px solid ${p.color}28;text-align:center;">
+          <div style="width:44px;height:44px;border-radius:50%;background:${p.color}18;border:2px solid ${p.color};margin:0 auto 10px;display:flex;align-items:center;justify-content:center;font-size:18px;">👑</div>
+          <div style="font-weight:800;font-size:14px;margin-bottom:4px;">${p.name}</div>
+          <div style="color:${p.color};font-size:20px;font-weight:900;font-family:'Orbitron',monospace;">${pct}%</div>
+          <div style="color:${p.color};font-size:14px;font-weight:700;margin-top:4px;">${fmt(amt)}</div>
+          <div style="margin-top:8px;height:4px;background:rgba(255,255,255,0.05);border-radius:2px;">
+            <div style="height:100%;width:${Math.min(pct,100)}%;background:${p.color};border-radius:2px;"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    ${Math.round(totalShare)!==100?`<div style="color:var(--red);font-size:12px;padding:8px 12px;background:rgba(255,68,85,0.08);border-radius:6px;border:1px solid rgba(255,68,85,0.2);">⚠ ສ່ວນແບ່ງທັງໝົດ = ${totalShare}% (ຄວນເປັນ 100%)</div>`:''}
+    <!-- Profit bar breakdown -->
+    <div style="background:rgba(255,255,255,0.025);border-radius:8px;padding:12px 14px;margin-top:4px;">
+      <div style="font-size:10px;color:var(--text-faint);letter-spacing:1px;margin-bottom:8px;">ສ່ວນແບ່ງ Visual</div>
+      <div style="height:16px;border-radius:8px;overflow:hidden;display:flex;">
+        ${DB.partners.map(p=>`<div style="flex:${p.share};background:${p.color};opacity:0.8;" title="${p.name}: ${p.share}%"></div>`).join('')}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+        ${DB.partners.map(p=>`<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim);"><div style="width:8px;height:8px;border-radius:2px;background:${p.color};"></div>${p.name} ${p.share}%</div>`).join('')}
       </div>
     </div>
-  </div>`;
+    `;
+  }
+
+  // ── EMPLOYEE LIST ────────────────────────────────────────────
+  const el = document.getElementById('db-emp-list');
+  if(el) el.innerHTML = DB.employees.length===0
+    ? `<div class="empty"><div class="eicon">👥</div><p>ຍັງບໍ່ມີພະນັກງານ</p></div>`
+    : DB.employees.map(e=>{
+      const empRev = DB.revenues.filter(r=>(r.empId===e.id||r.empName===e.name)&&(r.date||'')>=from&&(r.date||'')<=to).reduce((a,b)=>a+b.amount,0);
+      return `<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:rgba(255,255,255,0.025);border-radius:10px;border:1px solid ${e.status==='ONLINE'?'rgba(0,255,136,0.18)':'rgba(255,215,0,0.06)'};">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#1c1800,#120f00);border:2px solid rgba(255,215,0,0.22);display:flex;align-items:center;justify-content:center;font-size:16px;">👤</div>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:13px;">${e.name}</div>
+          <div class="td" style="font-size:10px;">Shift: ${e.shift}</div>
+        </div>
+        <div style="text-align:right;">
+          ${statusBadge(e.status)}
+          <div style="font-size:11px;color:var(--gold);margin-top:3px;font-weight:700;">${fmt(empRev)}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+  // ── ACTIVITY LOGS ────────────────────────────────────────────
+  const lg = document.getElementById('db-logs');
+  if(lg) lg.innerHTML = DB.actLogs.slice(0,7).map(l=>`
+    <div style="display:flex;gap:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <div class="fm" style="color:rgba(255,215,0,0.5);font-size:10px;min-width:34px;">${l.time}</div>
+      <div style="font-size:12px;"><span class="tg bold">${l.user}</span><span class="td"> — ${l.action}</span></div>
+    </div>`).join('');
 }
+
 
 // ============================================================
 // PAGE: REVENUE
@@ -1499,18 +1692,41 @@ function updateCalc(v){
 // ============================================================
 // PAGE: EXPENSES
 // ============================================================
+const EXP_CATS = ['ລະບົບ','ບໍລິຫານ','HR','ສຳຮອງ','ສາທາລະນູປະໂພກ','ການຕະຫຼາດ','ອື່ນໆ'];
+const CAT_COLORS = {'ລະບົບ':'#FF6B35','ບໍລິຫານ':'#FFD700','HR':'#00ff88','ສຳຮອງ':'#44aaff','ສາທາລະນູປະໂພກ':'#cc44ff','ການຕະຫຼາດ':'#ff4455','ອື່ນໆ':'#aaaaaa'};
+let _expPeriod = 'all'; // all | day | week | month
+
 function pgExpenses(){
   document.getElementById('ct').innerHTML=`
   <div class="g20 ai">
     <div class="ph">
       <div class="pt">ຈັດການລາຍຈ່າຍ</div>
     </div>
-    <div class="card glow p20 sc" style="max-width:300px;">
-      <div class="sl">ລາຍຈ່າຍທັງໝົດ</div>
-      <div class="sv tr" id="exp-total">${fmt(totalExp())}</div>
-      <div class="ss" id="exp-cnt">${DB.expenses.length} ລາຍການ</div>
+
+    <!-- PERIOD TABS -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      ${[['all','ທັງໝົດ'],['day','ມື້ນີ້'],['week','ອາທິດນີ້'],['month','ເດືອນນີ້']].map(([k,l])=>`
+        <button id="etab-${k}" onclick="setExpPeriod('${k}')"
+          class="btn ${_expPeriod===k?'btn-gold':'btn-outline'}"
+          style="font-size:12px;padding:8px 18px;">${l}</button>`).join('')}
     </div>
 
+    <!-- STAT CARDS -->
+    <div class="sgrid" id="exp-stats"></div>
+
+    <!-- BAR CHART + PIE -->
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:16px;" id="exp-charts-row">
+      <div class="card p24" id="exp-bar-card">
+        <div class="st">ລາຍຈ່າຍຕາມໄລຍະ</div>
+        <div id="exp-bar-wrap"></div>
+      </div>
+      <div class="card p24">
+        <div class="st">ແຍກຕາມປະເພດ</div>
+        <div id="exp-pie-wrap"></div>
+      </div>
+    </div>
+
+    <!-- ADD FORM -->
     <div class="card p24">
       <div class="st">ເພີ່ມລາຍຈ່າຍ</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px;margin-bottom:12px;">
@@ -1518,18 +1734,261 @@ function pgExpenses(){
         <div class="fgr"><label>ຈຳນວນ (₭)</label><input id="ex-a" type="number" placeholder="0" min="0"></div>
         <div class="fgr"><label>ວັນທີ</label><input id="ex-d" type="date" value="${today()}"></div>
         <div class="fgr"><label>ປະເພດ</label>
-          <select id="ex-c">
-            ${['ລະບົບ','ບໍລິຫານ','HR','ສຳຮອງ','ສາທາລະນູປະໂພກ','ການຕະຫຼາດ','ອື່ນໆ'].map(c=>`<option>${c}</option>`).join('')}
-          </select>
+          <select id="ex-c">${EXP_CATS.map(c=>`<option>${c}</option>`).join('')}</select>
         </div>
         <div class="fgr"><label>ໝາຍເຫດ</label><input id="ex-nt" placeholder="ໝາຍເຫດ..."></div>
       </div>
       <button class="btn btn-gold" onclick="addExp()">+ ເພີ່ມລາຍຈ່າຍ</button>
     </div>
 
-    <div class="g12" id="exp-list"></div>
+    <!-- TABLE -->
+    <div class="card p24">
+      <div class="ph" style="margin-bottom:12px;">
+        <div class="st" style="margin:0;">ຕາຕາລາງລາຍຈ່າຍ</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input class="search-box" style="width:160px;" placeholder="🔍 ຄົ້ນຫາ..." oninput="renderExpTable(this.value)" id="exp-search">
+          <select id="exp-cat-filter" onchange="renderExpTable()" style="width:130px;">
+            <option value="">ທຸກປະເພດ</option>
+            ${EXP_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="tw">
+        <table>
+          <thead><tr>
+            <th onclick="sortExpTable('date')" style="cursor:pointer;">ວັນທີ ↕</th>
+            <th onclick="sortExpTable('name')" style="cursor:pointer;">ຊື່ ↕</th>
+            <th>ປະເພດ</th>
+            <th onclick="sortExpTable('amount')" style="cursor:pointer;">ຈຳນວນ ↕</th>
+            <th>ໝາຍເຫດ</th>
+            <th>ຈັດການ</th>
+          </tr></thead>
+          <tbody id="exp-tbody"></tbody>
+        </table>
+      </div>
+      <div id="exp-table-summary"></div>
+    </div>
   </div>`;
-  renderExpList();
+  renderExpDashboard();
+}
+
+let _expSort = {col:'date', asc:false};
+
+function setExpPeriod(p){
+  _expPeriod = p;
+  // update tab styles
+  ['all','day','week','month'].forEach(k=>{
+    const el=document.getElementById('etab-'+k);
+    if(!el) return;
+    el.className='btn '+(k===p?'btn-gold':'btn-outline');
+    el.style.fontSize='12px'; el.style.padding='8px 18px';
+  });
+  renderExpDashboard();
+}
+
+function getExpFiltered(){
+  const now = new Date();
+  const td = today();
+  // week start (Monday)
+  const dow = now.getDay()===0?6:now.getDay()-1;
+  const weekStart = new Date(now); weekStart.setDate(now.getDate()-dow);
+  const ws = weekStart.toISOString().slice(0,10);
+  const ms = td.slice(0,7);
+  return DB.expenses.filter(e=>{
+    if(_expPeriod==='day') return (e.date||'')===td;
+    if(_expPeriod==='week') return (e.date||'')>=ws && (e.date||'')<=td;
+    if(_expPeriod==='month') return (e.date||'').startsWith(ms);
+    return true;
+  });
+}
+
+function renderExpDashboard(){
+  const exps = getExpFiltered();
+  const total = exps.reduce((a,b)=>a+b.amount,0);
+  const avg = exps.length>0?(total/exps.length):0;
+  const maxExp = exps.length>0?Math.max(...exps.map(e=>e.amount)):0;
+  const periodLabel = {all:'ທັງໝົດ',day:'ມື້ນີ້',week:'ອາທິດນີ້',month:'ເດືອນນີ້'}[_expPeriod];
+
+  // STAT CARDS
+  const sc = document.getElementById('exp-stats');
+  if(sc) sc.innerHTML=`
+    <div class="card glow-red p20 sc"><div class="bgi">💸</div><div class="sl">ລາຍຈ່າຍ (${periodLabel})</div><div class="sv tr">${fmt(total)}</div><div class="ss">${exps.length} ລາຍການ</div></div>
+    <div class="card p20 sc"><div class="bgi">📊</div><div class="sl">ສະເລ່ຍ/ລາຍການ</div><div class="sv tg">${fmt(Math.round(avg))}</div></div>
+    <div class="card p20 sc"><div class="bgi">🔺</div><div class="sl">ສູງສຸດ</div><div class="sv to">${fmt(maxExp)}</div><div class="ss">${exps.find(e=>e.amount===maxExp)?.name||'-'}</div></div>
+    <div class="card p20 sc"><div class="bgi">📦</div><div class="sl">ປະເພດ</div><div class="sv" style="color:var(--blue);">${new Set(exps.map(e=>e.category)).size}</div><div class="ss">ໝວດ</div></div>
+  `;
+
+  renderExpBarChart(exps);
+  renderExpPieChart(exps);
+  renderExpTable();
+}
+
+function renderExpBarChart(exps){
+  const wrap = document.getElementById('exp-bar-wrap'); if(!wrap) return;
+  if(exps.length===0){ wrap.innerHTML='<div class="empty" style="padding:24px 0;"><p>ບໍ່ມີຂໍ້ມູນ</p></div>'; return; }
+
+  let groups = {};
+  const now = new Date(); const td = today();
+
+  if(_expPeriod==='day'){
+    // group by category
+    exps.forEach(e=>{ groups[e.category]=(groups[e.category]||0)+e.amount; });
+  } else if(_expPeriod==='week'){
+    // group by day of week
+    const days=['ຈ','ອ','ພ','ພຫ','ສ','ເສ','ອາ'];
+    for(let i=6;i>=0;i--){
+      const d=new Date(now); d.setDate(now.getDate()-i);
+      const ds=d.toISOString().slice(0,10);
+      const dow=d.getDay()===0?6:d.getDay()-1;
+      const label=days[dow]+(ds===td?' (ນີ້)':'');
+      groups[ds]={label,val:0};
+    }
+    exps.forEach(e=>{ if(groups[e.date]) groups[e.date].val+=e.amount; });
+    const entries=Object.values(groups);
+    const maxV=Math.max(...entries.map(g=>g.val),1);
+    wrap.innerHTML=`<div class="bc" style="height:100px;align-items:flex-end;gap:4px;">
+      ${entries.map(g=>`<div class="bcc">
+        <div style="font-size:9px;color:var(--gold);margin-bottom:2px;">${g.val>0?(g.val/1000000).toFixed(1)+'M':''}</div>
+        <div style="width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--red),#cc2233);min-height:3px;height:${Math.max(4,(g.val/maxV)*80)}px;box-shadow:0 0 6px rgba(255,68,85,0.3);"></div>
+        <div class="bday" style="font-size:9px;">${g.label}</div>
+      </div>`).join('')}
+    </div>`;
+    return;
+  } else if(_expPeriod==='month'){
+    // group by week of month
+    exps.forEach(e=>{
+      if(!e.date) return;
+      const d=new Date(e.date); const wk=Math.ceil(d.getDate()/7);
+      const label='ອາທິດ'+wk;
+      groups[label]=(groups[label]||0)+e.amount;
+    });
+  } else {
+    // all — group by month
+    exps.forEach(e=>{
+      if(!e.date) return;
+      const m=e.date.slice(0,7);
+      groups[m]=(groups[m]||0)+e.amount;
+    });
+  }
+
+  if(_expPeriod==='day'){
+    // category bar chart
+    const entries=Object.entries(groups).sort((a,b)=>b[1]-a[1]);
+    const maxV=Math.max(...entries.map(g=>g[1]),1);
+    wrap.innerHTML=`<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      ${entries.map(([cat,val])=>`
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">
+          <span style="color:${CAT_COLORS[cat]||'var(--gold)'};">${cat}</span>
+          <span style="color:var(--text-dim);">${fmt(val)}</span>
+        </div>
+        <div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;">
+          <div style="height:100%;width:${(val/maxV*100).toFixed(1)}%;background:${CAT_COLORS[cat]||'var(--gold)'};border-radius:4px;box-shadow:0 0 6px ${CAT_COLORS[cat]||'var(--gold)'}44;transition:width .4s;"></div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+    return;
+  }
+
+  const entries=Object.entries(groups).sort((a,b)=>a[0]>b[0]?1:-1);
+  const maxV=Math.max(...entries.map(g=>g[1]),1);
+  wrap.innerHTML=`<div class="bc" style="height:100px;align-items:flex-end;gap:4px;">
+    ${entries.map(([lbl,val])=>`<div class="bcc">
+      <div style="font-size:9px;color:var(--red);margin-bottom:2px;">${val>0?(val/1000000).toFixed(1)+'M':''}</div>
+      <div style="width:100%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--red),#cc2233);min-height:3px;height:${Math.max(4,(val/maxV)*80)}px;box-shadow:0 0 6px rgba(255,68,85,0.3);"></div>
+      <div class="bday" style="font-size:9px;">${lbl.length>7?lbl.slice(5):lbl}</div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function renderExpPieChart(exps){
+  const wrap = document.getElementById('exp-pie-wrap'); if(!wrap) return;
+  if(exps.length===0){ wrap.innerHTML='<div class="empty" style="padding:24px 0;"><p>ບໍ່ມີຂໍ້ມູນ</p></div>'; return; }
+  const cats={};
+  exps.forEach(e=>{ cats[e.category]=(cats[e.category]||0)+e.amount; });
+  const total=Object.values(cats).reduce((a,b)=>a+b,0)||1;
+  const entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+
+  // SVG donut chart
+  const cx=80, cy=80, r=60, ri=38;
+  let angle=-Math.PI/2;
+  const slices=entries.map(([cat,val])=>{
+    const sweep=val/total*2*Math.PI;
+    const x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+    angle+=sweep;
+    const x2=cx+r*Math.cos(angle), y2=cy+r*Math.sin(angle);
+    const xi1=cx+ri*Math.cos(angle-sweep), yi1=cy+ri*Math.sin(angle-sweep);
+    const xi2=cx+ri*Math.cos(angle), yi2=cy+ri*Math.sin(angle);
+    const large=sweep>Math.PI?1:0;
+    return {cat,val,color:CAT_COLORS[cat]||'#aaa',
+      d:`M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} L${xi2},${yi2} A${ri},${ri} 0 ${large},0 ${xi1},${yi1} Z`};
+  });
+
+  wrap.innerHTML=`
+  <svg viewBox="0 0 200 160" width="100%" style="max-height:160px;">
+    ${slices.map(s=>`<path d="${s.d}" fill="${s.color}" opacity="0.88" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/>`).join('')}
+    <text x="${cx}" y="${cy-5}" text-anchor="middle" fill="rgba(255,255,255,0.6)" font-size="9" font-family="'Share Tech Mono',monospace">ລາຍຈ່າຍ</text>
+    <text x="${cx}" y="${cy+8}" text-anchor="middle" fill="var(--red,#ff4455)" font-size="10" font-weight="bold" font-family="'Orbitron',monospace">${(exps.length)}</text>
+    <text x="${cx}" y="${cy+20}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="7" font-family="sans-serif">ລາຍການ</text>
+    ${entries.slice(0,5).map(([cat,val],i)=>`
+      <rect x="165" y="${14+i*22}" width="9" height="9" rx="2" fill="${CAT_COLORS[cat]||'#aaa'}"/>
+      <text x="178" y="${22+i*22}" font-size="8.5" fill="rgba(255,255,255,0.7)" font-family="sans-serif">${cat}</text>
+      <text x="198" y="${22+i*22}" text-anchor="end" font-size="8" fill="rgba(255,255,255,0.45)" font-family="sans-serif">${(val/total*100).toFixed(0)}%</text>
+    `).join('')}
+  </svg>`;
+}
+
+function sortExpTable(col){
+  if(_expSort.col===col) _expSort.asc=!_expSort.asc;
+  else { _expSort.col=col; _expSort.asc=col==='date'?false:true; }
+  renderExpTable();
+}
+
+function renderExpTable(q){
+  const tb=document.getElementById('exp-tbody'); if(!tb) return;
+  const search=(q!==undefined?q:(document.getElementById('exp-search')?.value||'')).toLowerCase();
+  const catF=document.getElementById('exp-cat-filter')?.value||'';
+  let rows=getExpFiltered();
+  if(search) rows=rows.filter(e=>e.name.toLowerCase().includes(search)||e.category.toLowerCase().includes(search)||(e.notes||'').toLowerCase().includes(search)||(e.date||'').includes(search));
+  if(catF) rows=rows.filter(e=>e.category===catF);
+  // sort
+  rows=[...rows].sort((a,b)=>{
+    let va=a[_expSort.col]||'', vb=b[_expSort.col]||'';
+    if(_expSort.col==='amount'){ va=Number(va); vb=Number(vb); }
+    const cmp=va<vb?-1:va>vb?1:0;
+    return _expSort.asc?cmp:-cmp;
+  });
+
+  if(rows.length===0){ tb.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-faint);">ບໍ່ມີຂໍ້ມູນ</td></tr>`; return; }
+  const total=rows.reduce((a,b)=>a+b.amount,0);
+
+  tb.innerHTML=rows.map(e=>`<tr>
+    <td class="td fm" style="font-size:12px;">${e.date||'-'}</td>
+    <td style="font-weight:700;">${e.name}</td>
+    <td><span class="tag" style="background:${CAT_COLORS[e.category]||'#aaa'}18;color:${CAT_COLORS[e.category]||'#aaa'};border:1px solid ${CAT_COLORS[e.category]||'#aaa'}44;">${e.category}</span></td>
+    <td class="tr" style="font-weight:800;">${fmt(e.amount)}</td>
+    <td class="td" style="font-size:12px;">${e.notes||'-'}</td>
+    <td style="display:flex;gap:5px;">
+      <button class="btn btn-outline" style="font-size:10px;padding:4px 8px;" onclick="openEditExp(${e.id})">✏</button>
+      <button class="btn btn-red" style="font-size:10px;padding:4px 8px;" onclick="delExpAndRefresh(${e.id})">✕</button>
+    </td>
+  </tr>`).join('');
+
+  const sumEl=document.getElementById('exp-table-summary');
+  if(sumEl) sumEl.innerHTML=`<div class="sum-row" style="margin-top:10px;">
+    <span class="td">${rows.length} ລາຍການ</span>
+    <span class="tr bold">${fmt(total)}</span>
+  </div>`;
+}
+
+function delExpAndRefresh(id){
+  const e=DB.expenses.find(x=>x.id===id);
+  if(!e||!confirm(`ລຶບ "${e.name}" ແທ້ບໍ?`)) return;
+  DB.expenses=DB.expenses.filter(x=>x.id!==id);
+  addLog(SESSION.user.name,`ລຶບລາຍຈ່າຍ: ${e.name}`,'expense');
+  saveData();
+  renderExpDashboard();
+  showToast('ລຶບສຳເລັດ');
 }
 
 function addExp(){
@@ -1543,9 +2002,7 @@ function addExp(){
   addLog(SESSION.user.name,`ເພີ່ມລາຍຈ່າຍ: ${name} ${fmt(amount)}`,'expense');
   saveData();
   document.getElementById('ex-n').value=''; document.getElementById('ex-a').value=''; document.getElementById('ex-nt').value='';
-  renderExpList();
-  document.getElementById('exp-total').textContent=fmt(totalExp());
-  document.getElementById('exp-cnt').textContent=`${DB.expenses.length} ລາຍການ`;
+  renderExpDashboard();
   showToast('ເພີ່ມລາຍຈ່າຍສຳເລັດ');
 }
 
@@ -1554,9 +2011,7 @@ function delExp(id){
   if(!confirm(`ລຶບ "${e.name}" ແທ້ບໍ?`)) return;
   DB.expenses=DB.expenses.filter(x=>x.id!==id);
   addLog(SESSION.user.name,`ລຶບລາຍຈ່າຍ: ${e.name}`,'expense');
-  saveData(); renderExpList();
-  document.getElementById('exp-total').textContent=fmt(totalExp());
-  document.getElementById('exp-cnt').textContent=`${DB.expenses.length} ລາຍການ`;
+  saveData(); renderExpDashboard();
   showToast('ລຶບສຳເລັດ');
 }
 
@@ -1583,8 +2038,7 @@ function openEditExp(id){
       e.category=document.getElementById('ee-c').value;
       e.notes=document.getElementById('ee-nt').value;
       addLog(SESSION.user.name,`ແກ້ໄຂລາຍຈ່າຍ: ${e.name}`,'expense');
-      saveData(); closeModal(); renderExpList();
-      document.getElementById('exp-total').textContent=fmt(totalExp());
+      saveData(); closeModal(); renderExpDashboard();
       showToast('ແກ້ໄຂສຳເລັດ');
     }},{label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
   );
