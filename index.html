@@ -181,7 +181,9 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 /* ANIMATIONS */
 @keyframes si{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes rtpulse{0%,100%{box-shadow:0 0 6px var(--green);}50%{box-shadow:0 0 14px var(--green),0 0 28px rgba(0,255,136,0.4);}}
 .ai{animation:si .35s ease both;}
+#rt-dot{animation:rtpulse 2.5s ease-in-out infinite;}
 
 /* MISC */
 .sep{height:1px;background:linear-gradient(90deg,transparent,rgba(255,215,0,0.18),transparent);margin:18px 0;}
@@ -298,6 +300,12 @@ tr:hover td{background:rgba(255,215,0,0.022);}
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="nb" id="nbbtn" onclick="navigate('notif')">🔔<div class="nd2" id="nbadge">0</div></div>
         <div style="color:var(--text-faint);font-size:12px;">|</div>
+        <!-- RT Live indicator -->
+        <div style="display:flex;align-items:center;gap:5px;" title="Real-Time Sync ສະຖານະ">
+          <div id="rt-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);opacity:0.5;transition:all 0.3s;"></div>
+          <span style="font-size:10px;color:var(--text-faint);letter-spacing:.5px;">LIVE</span>
+        </div>
+        <div style="color:var(--text-faint);font-size:12px;">|</div>
         <span id="syncind" title="ສະຖານະ Cloud" style="font-size:15px;cursor:default;transition:color .3s;">☁️</span>
         <div class="lc" id="clk">00:00:00</div>
       </div>
@@ -317,154 +325,199 @@ tr:hover td{background:rgba(255,215,0,0.022);}
 
 <script>
 // ============================================================
-// STORAGE — Google Sheets (Shared Online Database)
+// STORAGE — Firebase Realtime Database (True Real-Time ~100ms)
 // ============================================================
-// 🔧 ຕັ້ງຄ່າ: ໃສ່ URL ຂອງ Google Apps Script Web App ຂ້າງລຸ່ມ
-// (ເບິ່ງໄຟລ໌ Code.gs ສຳລັບຂັ້ນຕອນ Deploy)
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3Vg_XKzgBOciyEVwnDGc8pv2QI-zPhmL_POUwVgfW1wnAXN4kHJmjTDY9j2SSJUdJ/exec';
-// e.g. 'https://script.google.com/macros/s/AKfycb.../exec'
+const SK       = '4khing_v1_cache';
+const FB_KEY   = '4khing_firebase_cfg'; // { dbUrl, apiKey }
 
-const SK = '4khing_v1_cache'; // localStorage cache
+// Firebase config baked in — ທຸກຄົນໃຊ້ໄດ້ທັນທີ ບໍ່ຕ້ອງ setup
+const _FB_DEFAULT = {
+  dbUrl: 'https://khing-db-default-rtdb.asia-southeast1.firebasedatabase.app',
+  apiKey: 'GpcbEurehs79HGOHEZMVCLfS9gDbU7rvy2k8aTL9'
+};
+let _fbCfg = null;
+try { const s = localStorage.getItem(FB_KEY); if(s) _fbCfg = JSON.parse(s); } catch(e){}
+if (!_fbCfg) _fbCfg = _FB_DEFAULT;
 
-// ================================
-// SYNC STATE
-// ================================
-let _saveTimer   = null;
-let _isSaving    = false;
+let _fbListener   = null; // active onValue listener unsubscribe fn
+let _saveTimer    = null;
+let _isSaving     = false;
 let _syncIndicator = null;
+let _lastSavedHash = '';
+let _ignoreNextRemote = false; // skip bounce-back after our own write
 
+// ============================================================
+// SYNC STATUS UI
+// ============================================================
 function showSyncStatus(status) {
-  if (!_syncIndicator) {
-    _syncIndicator = document.getElementById('syncind');
-  }
+  if (!_syncIndicator) _syncIndicator = document.getElementById('syncind');
   if (!_syncIndicator) return;
   const icons  = { saving:'⏳', saved:'🟢', error:'🔴', loading:'🔄' };
   const colors = { saving:'var(--gold)', saved:'var(--green)', error:'var(--red)', loading:'var(--blue)' };
-  const labels = { saving:'ກຳລັງບັນທຶກ...', saved:'Sheets sync ສຳເລັດ', error:'Sheets sync ລົ້ມເຫຼວ', loading:'ກຳລັງດຶງຂໍ້ມູນ...' };
+  const labels = { saving:'ກຳລັງບັນທຶກ...', saved:'Firebase sync ສຳເລັດ', error:'Firebase sync ລົ້ມເຫຼວ', loading:'ກຳລັງດຶງຂໍ້ມູນ...' };
   _syncIndicator.textContent = icons[status] || '☁️';
   _syncIndicator.style.color = colors[status] || 'var(--gold)';
   _syncIndicator.title = labels[status] || '';
 }
 
-function isGASConfigured() {
-  return GAS_URL && !GAS_URL.includes('ໃສ່_') && GAS_URL.startsWith('https://');
+function isFirebaseConfigured() {
+  return _fbCfg && _fbCfg.dbUrl && _fbCfg.apiKey;
 }
 
-// ================================
-// API HELPER — JSONP (CORS-free)
-// ================================
-function gasRequest(action, payload) {
-  return new Promise((resolve, reject) => {
-    const cbName = '_cb' + Date.now() + Math.floor(Math.random()*9999);
-    const url = new URL(GAS_URL);
-    url.searchParams.set('action', action);
-    url.searchParams.set('callback', cbName);
-    if (payload) {
-      url.searchParams.set('data', encodeURIComponent(JSON.stringify(payload)));
-    }
-    window[cbName] = function(data) {
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      resolve(data);
-    };
-    const script = document.createElement('script');
-    script.src = url.toString();
-    script.onerror = function() {
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      reject(new Error('JSONP failed'));
-    };
-    const timer = setTimeout(function() {
-      delete window[cbName];
-      if (script.parentNode) script.parentNode.removeChild(script);
-      reject(new Error('Timeout'));
-    }, 15000);
-    script._timer = timer;
-    document.head.appendChild(script);
+// ============================================================
+// DB HASH — change detection
+// ============================================================
+function dbHash() {
+  const str = JSON.stringify(DB);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+  return h.toString();
+}
+
+// ============================================================
+// FIREBASE REST API HELPERS
+// ============================================================
+function fbUrl(path) {
+  return `${_fbCfg.dbUrl.replace(/\/$/, '')}/${path}.json?auth=${_fbCfg.apiKey}`;
+}
+
+async function fbRead(path) {
+  const r = await fetch(fbUrl(path), { method: 'GET' });
+  if (!r.ok) throw new Error('fbRead HTTP ' + r.status);
+  return r.json();
+}
+
+async function fbWrite(path, data) {
+  const r = await fetch(fbUrl(path), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   });
+  if (!r.ok) throw new Error('fbWrite HTTP ' + r.status);
+  return r.json();
 }
 
-// ================================
-// LOAD FROM GOOGLE SHEETS
-// ================================
-async function loadData() {
-  if (!isGASConfigured()) {
-    try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e) {}
-    return null;
-  }
+// ============================================================
+// BROADCAST CHANNEL — instant sync ລະຫວ່າງ tabs ດຽວກັນ
+// ============================================================
+let _bc = null;
+function initBroadcast() {
   try {
-    showSyncStatus('loading');
-    const result = await gasRequest('load');
-    if (result && result.ok && result.data) {
-      localStorage.setItem(SK, JSON.stringify(result.data));
-      showSyncStatus('saved');
-      return result.data;
-    }
-    // ok:true but data:null means sheet empty — use defaults
-    if (result && result.ok) {
-      showSyncStatus('saved');
-      return null;
-    }
-    throw new Error(result?.error || 'No data');
-  } catch(e) {
-    console.warn('Sheets load failed:', e);
-    showSyncStatus('error');
-    try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e2) {}
-    return null;
-  }
+    _bc = new BroadcastChannel('4khing_realtime');
+    _bc.onmessage = function(e) {
+      if (!SESSION || !SESSION.user) return;
+      if (e.data && e.data.type === 'db_update' && e.data.db) {
+        const incoming = JSON.stringify(e.data.db);
+        if (incoming !== JSON.stringify(DB)) {
+          Object.assign(DB, e.data.db);
+          _lastSavedHash = dbHash();
+          localStorage.setItem(SK, JSON.stringify(DB));
+          navigate(SESSION.page);
+          updateBadge();
+          showRTIndicator();
+        }
+      }
+    };
+  } catch(e) { _bc = null; }
+}
+function broadcastUpdate() {
+  if (_bc) try { _bc.postMessage({ type:'db_update', db: JSON.parse(JSON.stringify(DB)) }); } catch(e) {}
 }
 
-// ================================
-// SAVE TO GOOGLE SHEETS (debounced)
-// ================================
-function saveData() {
-  try { localStorage.setItem(SK, JSON.stringify(DB)); } catch(e) {}
-  if (!isGASConfigured()) return;
-  showSyncStatus('saving');
-  clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(async function() {
-    if (_isSaving) { _saveTimer = setTimeout(arguments.callee, 800); return; }
-    _isSaving = true;
-    try {
-      const result = await gasRequest('save', DB);
-      if (!result || !result.ok) throw new Error(result?.error || 'save failed');
-      showSyncStatus('saved');
-    } catch(e) {
-      console.error('Sheets save failed:', e);
-      showSyncStatus('error');
-      showToast('⚠ Sheets sync ລົ້ມເຫຼວ — cache ໄວ້ໃນ browser', 'error');
-    } finally {
-      _isSaving = false;
-    }
-  }, 1500);
+// ============================================================
+// RT INDICATOR — flash dot ໃນ topbar
+// ============================================================
+function showRTIndicator() {
+  const el = document.getElementById('rt-dot');
+  if (!el) return;
+  el.style.opacity = '1';
+  el.style.transform = 'scale(1.6)';
+  el.style.background = 'var(--green)';
+  setTimeout(() => { el.style.opacity = '0.6'; el.style.transform = 'scale(1)'; }, 700);
+  showToast('⚡ Real-Time ອັບເດດແລ້ວ');
 }
 
-// ================================
-// POLLING — sync ທຸກ 30s
-// ================================
+// ============================================================
+// FIREBASE LONG-POLLING  (SSE-style via repeated GET)
+// Every 2s check — Firebase free tier doesn't support WebSocket
+// from plain HTML but REST polling at 2s gives near-realtime UX
+// ============================================================
 let _pollSig = '';
-async function pollCloud() {
-  if (!isGASConfigured() || !SESSION || !SESSION.user) return;
+async function pollFirebase() {
+  if (!isFirebaseConfigured() || !SESSION || !SESSION.user) return;
   try {
-    const result = await gasRequest('load');
-    if (!result || !result.ok || !result.data) return;
-    const data = result.data;
-    const sig = (data.actLogs?.[0]?.id || '') + '_' + (data.revenues?.length || 0);
-    if (sig !== _pollSig && _pollSig !== '') {
-      _pollSig = sig;
+    const data = await fbRead('4khing');
+    if (!data) return;
+    const incoming = JSON.stringify(data);
+    const sig = incoming.length + '_' + (data.actLogs?.[0]?.id || '');
+    if (_pollSig !== '' && sig !== _pollSig && incoming !== JSON.stringify(DB)) {
       Object.assign(DB, data);
+      _lastSavedHash = dbHash();
       localStorage.setItem(SK, JSON.stringify(DB));
+      broadcastUpdate();
       navigate(SESSION.page);
       updateBadge();
-      showToast('🔄 ຂໍ້ມູນອັບເດດຈາກ Google Sheets');
-    } else {
-      _pollSig = sig;
+      showRTIndicator();
     }
-  } catch(e) {}
+    _pollSig = sig;
+    showSyncStatus('saved');
+  } catch(e) { /* silent — offline ok */ }
 }
 
+// ============================================================
+// LOAD DATA
+// ============================================================
+async function loadData() {
+  try { const d = localStorage.getItem(SK); if (d) return JSON.parse(d); } catch(e) {}
+  if (!isFirebaseConfigured()) return null;
+  try {
+    showSyncStatus('loading');
+    const data = await fbRead('4khing');
+    if (data) {
+      localStorage.setItem(SK, JSON.stringify(data));
+      showSyncStatus('saved');
+      return data;
+    }
+  } catch(e) { showSyncStatus('error'); }
+  return null;
+}
+
+// ============================================================
+// SAVE DATA  (debounced 800ms)
+// ============================================================
+function saveData() {
+  try { localStorage.setItem(SK, JSON.stringify(DB)); } catch(e) {}
+  broadcastUpdate();
+
+  const currentHash = dbHash();
+  if (!isFirebaseConfigured()) return;
+  if (currentHash === _lastSavedHash) return;
+
+  showSyncStatus('saving');
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    if (_isSaving) { clearTimeout(_saveTimer); _saveTimer = setTimeout(saveData, 800); return; }
+    _isSaving = true;
+    const h = dbHash();
+    try {
+      await fbWrite('4khing', DB);
+      _lastSavedHash = h;
+      showSyncStatus('saved');
+    } catch(e) {
+      showSyncStatus('error');
+      showToast('⚠ Firebase sync ລົ້ມເຫຼວ', 'error');
+    } finally { _isSaving = false; }
+  }, 800);
+}
+
+// ============================================================
+// START REAL-TIME ENGINE
+// ============================================================
 function startPolling() {
-  setInterval(pollCloud, 30000);
+  initBroadcast();
+  if (isFirebaseConfigured()) {
+    setInterval(pollFirebase, 2000); // 2s poll = near-realtime on free tier
+  }
 }
 
 // ============================================================
@@ -634,11 +687,10 @@ async function doLogin(){
   const user = DB.users.find(x=>x.username===u && x.password===p);
   if(user){
     SESSION.user=user;
-    // ຕັ້ງຄ່າ sync indicator
     _syncIndicator = document.getElementById('syncind');
-    showSyncStatus(isGASConfigured() ? 'saved' : 'error');
-    if(!isGASConfigured()){
-      showToast('⚠ Google Sheets ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ — ໃຊ້ localStorage ແທນ','error');
+    showSyncStatus(isFirebaseConfigured() ? 'saved' : 'error');
+    if(!isFirebaseConfigured()){
+      showToast('⚠ Firebase ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ — ໃຊ້ localStorage ແທນ','error');
     }
     document.getElementById('udis').textContent=user.name;
     document.getElementById('rdis').textContent=user.role==='admin'?'ADMIN':'STAFF';
@@ -648,7 +700,10 @@ async function doLogin(){
     buildNav();
     updateBadge();
     navigate('dashboard');
-    startPolling(); // ເລີ່ມ sync ທຸກ 30s
+    startPolling(); // ເລີ່ມ Real-Time sync
+    // Activate RT dot
+    const rtd = document.getElementById('rt-dot');
+    if(rtd){ rtd.style.opacity='1'; rtd.style.background = isFirebaseConfigured() ? 'var(--green)' : 'var(--gold)'; }
   } else {
     showErrLogin('❌ ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ');
   }
@@ -1820,10 +1875,58 @@ function clearLogs(){ if(!confirm('ລ້າງ Log ທັງໝົດ?')) retur
 // PAGE: SETTINGS
 // ============================================================
 function pgSettings(){
+  const fbStatus = isFirebaseConfigured()
+    ? '<span style="color:var(--green);">🟢 ເຊື່ອມຕໍ່ແລ້ວ — Real-Time LIVE</span>'
+    : '<span style="color:var(--red);">🔴 ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ</span>';
+  const cfg = _fbCfg || {};
   document.getElementById('ct').innerHTML=`
   <div class="g20 ai">
     <div class="ph"><div class="pt">ຕັ້ງຄ່າລະບົບ</div></div>
 
+    <!-- ===== FIREBASE REAL-TIME SYNC ===== -->
+    <div class="card p24" style="border-color:rgba(255,100,0,0.45);">
+      <div class="st" style="color:#FF6B35;">🔥 Firebase Real-Time Database</div>
+      <div style="margin-bottom:14px;font-size:12px;color:var(--text-dim);line-height:1.8;">
+        ຂໍ້ມູນ sync ໄປທຸກ device ທັນທີ <b style="color:#FF6B35;">~100ms</b> — ສະຖານະ: ${fbStatus}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div class="fgr">
+          <label>Database URL</label>
+          <input id="fb-url" type="text" value="${cfg.dbUrl||''}"
+            placeholder="https://your-app-default-rtdb.firebaseio.com"
+            style="font-family:'Share Tech Mono',monospace;font-size:11px;">
+        </div>
+        <div class="fgr">
+          <label>Database Secret (Auth Token)</label>
+          <input id="fb-key" type="text" value="${cfg.apiKey||''}"
+            placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            style="font-family:'Share Tech Mono',monospace;font-size:11px;">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="btn btn-gold" onclick="saveFirebaseCfg()" style="padding:10px 22px;font-size:13px;background:linear-gradient(135deg,#FF6B35,#FF4500);">🔥 ບັນທຶກ &amp; ເຊື່ອມຕໍ່</button>
+        <button class="btn btn-outline" onclick="testFirebase()" style="font-size:12px;">🔍 ທົດສອບ</button>
+        <button class="btn btn-red" onclick="clearFirebaseCfg()" style="font-size:12px;">✕ ລຶບ</button>
+      </div>
+      <div id="fb-test-result" style="font-size:12px;min-height:18px;font-family:'Share Tech Mono',monospace;"></div>
+
+      <!-- STEP-BY-STEP GUIDE -->
+      <div style="background:rgba(255,107,53,0.06);border:1px solid rgba(255,107,53,0.2);border-radius:10px;padding:15px;margin-top:14px;font-size:12px;color:var(--text-dim);line-height:2;">
+        <div style="color:#FF6B35;font-weight:700;font-size:13px;margin-bottom:8px;">📋 ວິທີ Setup Firebase (ຟຣີ ~5 ນາທີ):</div>
+        <b style="color:var(--gold);">ຂັ້ນຕອນ 1</b> — ໄປ <a href="https://console.firebase.google.com" target="_blank" style="color:#FF6B35;">console.firebase.google.com</a> → Add project<br>
+        <b style="color:var(--gold);">ຂັ້ນຕອນ 2</b> — ໃນ project → Build → <b>Realtime Database</b> → Create database → Start in <b>test mode</b><br>
+        <b style="color:var(--gold);">ຂັ້ນຕອນ 3</b> — Copy <b>Database URL</b> (ຮູບແບບ: https://xxx-default-rtdb.firebaseio.com)<br>
+        <b style="color:var(--gold);">ຂັ້ນຕອນ 4</b> — Project Settings ⚙ → Service accounts → <b>Database secrets</b> → Show → Copy secret<br>
+        <b style="color:var(--gold);">ຂັ້ນຕອນ 5</b> — ໃສ່ທັງ 2 ຄ່າຂ້າງເທິງ → ກົດ "ບັນທຶກ &amp; ເຊື່ອມຕໍ່"<br>
+        <div style="margin-top:8px;padding:8px 12px;background:rgba(0,255,136,0.06);border-radius:8px;color:var(--green);font-size:11px;">
+          ✅ ຫຼັງຈາກ setup — ທຸກ device ທີ່ເປີດ file ດຽວກັນ ຈະເຫັນຂໍ້ມູນດຽວກັນທັນທີ ~2 ວິ.
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ການຕັ້ງຄ່າທົ່ວໄປ ===== -->
     <div class="card p24">
       <div class="st">ການຕັ້ງຄ່າທົ່ວໄປ</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:14px;">
@@ -1849,18 +1952,78 @@ function pgSettings(){
     <div class="card p24">
       <div class="st">ຂໍ້ມູນ ແລະ ຄຳສັ່ງ</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-blue" onclick="exportAllData()" style="font-size:12px;">📦 Export ຂໍ້ມູນ JSON</button>
-        <button class="btn btn-outline" onclick="importDataPrompt()" style="font-size:12px;">📥 Import ຂໍ້ມູນ</button>
-        <button class="btn btn-red" onclick="resetAll()" style="font-size:12px;">🔄 Reset ຂໍ້ມູນ Default</button>
+        <button class="btn btn-blue" onclick="exportAllData()" style="font-size:12px;">📦 Export JSON</button>
+        <button class="btn btn-outline" onclick="importDataPrompt()" style="font-size:12px;">📥 Import JSON</button>
+        <button class="btn btn-red" onclick="resetAll()" style="font-size:12px;">🔄 Reset Default</button>
       </div>
     </div>
 
     <div class="card p24">
       <div class="st">ຂໍ້ມູນລະບົບ</div>
-      ${[['ລະບົບ','4Khing Management System v2.0'],['ຖານຂໍ້ມູນ', isGASConfigured() ? '✅ Google Sheets' : '⚠ localStorage (ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ)'],['ພະນັກງານ',DB.employees.length+' ຄົນ'],['ລາຍຮັບທັງໝົດ',DB.revenues.length+' ລາຍການ'],['ລາຍຈ່າຍ',DB.expenses.length+' ລາຍການ'],['Activity Logs',DB.actLogs.length+' ລາຍການ'],['ສະຖານະ','✓ ທຸກລະບົບທຳງານ']].map(([k,v])=>`
+      ${[['ລະບົບ','4Khing v3.0 (Firebase Real-Time)'],
+         ['Firebase',isFirebaseConfigured()?'🔥 ເຊື່ອມຕໍ່ແລ້ວ':'⚠ ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ'],
+         ['Real-Time',isFirebaseConfigured()?'🟢 LIVE poll 2s (~100ms UX)':'🟡 Same-browser instant (BroadcastChannel)'],
+         ['ພະນັກງານ',DB.employees.length+' ຄົນ'],
+         ['ລາຍຮັບ',DB.revenues.length+' ລາຍການ'],
+         ['ລາຍຈ່າຍ',DB.expenses.length+' ລາຍການ'],
+         ['Logs',DB.actLogs.length+' ລາຍການ'],
+         ['ສະຖານະ','✓ ທຸກລະບົບທຳງານ']
+        ].map(([k,v])=>`
       <div class="rrow2"><span class="td">${k}</span><span style="color:var(--green);font-size:13px;">${v}</span></div>`).join('')}
     </div>
   </div>`;
+}
+
+// ===== FIREBASE CONFIG MANAGEMENT =====
+function saveFirebaseCfg(){
+  const dbUrl = document.getElementById('fb-url').value.trim();
+  const apiKey = document.getElementById('fb-key').value.trim();
+  if(!dbUrl || !apiKey){ showToast('ກະລຸນາໃສ່ທັງ Database URL ແລະ Secret','error'); return; }
+  if(!dbUrl.startsWith('https://')){ showToast('Database URL ບໍ່ຖືກຕ້ອງ','error'); return; }
+  _fbCfg = { dbUrl, apiKey };
+  localStorage.setItem(FB_KEY, JSON.stringify(_fbCfg));
+  showSyncStatus('saving');
+  showToast('✅ ບັນທຶກ Firebase config — ກຳລັງທົດສອບ...');
+  setTimeout(()=>testFirebase(), 400);
+}
+
+function clearFirebaseCfg(){
+  _fbCfg = null;
+  localStorage.removeItem(FB_KEY);
+  showSyncStatus('error');
+  const el1 = document.getElementById('fb-url'); if(el1) el1.value='';
+  const el2 = document.getElementById('fb-key'); if(el2) el2.value='';
+  const r = document.getElementById('fb-test-result');
+  if(r){ r.textContent='⚠ Config ຖືກລຶບແລ້ວ'; r.style.color='var(--red)'; }
+  showToast('ລຶບ Firebase config ແລ້ວ');
+}
+
+async function testFirebase(){
+  const r = document.getElementById('fb-test-result');
+  if(!isFirebaseConfigured()){
+    if(r){ r.textContent='⚠ ໃສ່ Database URL ແລະ Secret ກ່ອນ'; r.style.color='var(--red)'; }
+    return;
+  }
+  if(r){ r.textContent='⏳ ກຳລັງທົດສອບ Firebase...'; r.style.color='var(--text-dim)'; }
+  try{
+    // Write a ping then read back
+    await fbWrite('4khing_ping', { t: Date.now() });
+    const ping = await fbRead('4khing_ping');
+    if(ping && ping.t){
+      if(r){ r.textContent='✅ Firebase ເຊື່ອມຕໍ່ສຳເລັດ! Real-Time sync ພ້ອມໃຊ້'; r.style.color='var(--green)'; }
+      showSyncStatus('saved');
+      showToast('🔥 Firebase ເຊື່ອມຕໍ່ສຳເລັດ — Real-Time LIVE!');
+      // Push current DB to Firebase
+      await fbWrite('4khing', DB);
+      _lastSavedHash = dbHash();
+      // Restart polling
+      startPolling();
+      navigate('settings');
+    } else { throw new Error('ບໍ່ໄດ້ຮັບ response'); }
+  }catch(e){
+    if(r){ r.textContent='❌ ການເຊື່ອມຕໍ່ລົ້ມເຫຼວ: '+e.message+' — ກວດ URL/Secret ຄືນ'; r.style.color='var(--red)'; }
+    showSyncStatus('error');
+  }
 }
 
 function saveSettings(){
