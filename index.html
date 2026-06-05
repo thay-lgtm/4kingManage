@@ -1320,30 +1320,51 @@ function pgRevenue(){
         <button class="btn btn-gold" onclick="addRev()" style="width:100%;padding:13px;font-size:14px;">+ ບັນທຶກລາຍຮັບ</button>
       </div>
 
-      <!-- LIVE PREVIEW (BCEL-style) -->
+      <!-- LIVE PREVIEW — BCEL Amount format -->
       <div class="card p24" id="rev-preview-card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+        <!-- Title -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
           <span style="font-size:18px;">💰</span>
-          <span style="font-size:15px;font-weight:700;color:var(--gold);">ຍອດເງິນ (Amount)</span>
+          <span style="font-size:16px;font-weight:700;">ຍອດເງິນ (Amount)</span>
         </div>
-        ${[
-          ['ຍອດຝາກ',   '₭0', 'var(--green)'],
-          ['ຍອດຖອນ',   '₭0', 'var(--red)'],
-          ['ລາງວັນ',   '₭0', 'var(--gold3)'],
-          ['Commission','₭0', 'var(--blue)'],
-          ['ລາຍຮັບລວມ','₭0', 'var(--gold)'],
-        ].map(([l,v,c],i)=>`
-          <div id="rpv-row-${i}" style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px;">
-            <span style="color:var(--text-dim);">${l}</span>
-            <span id="rpv-val-${i}" style="color:${c};font-weight:700;">${v}</span>
-          </div>`).join('')}
-        <div style="display:flex;justify-content:space-between;padding:11px 12px;background:rgba(255,215,0,0.06);border-radius:8px;margin-top:8px;font-size:14px;">
-          <span style="font-weight:700;">ສ່ວນຕ່າງ</span>
-          <span id="rpv-net" style="font-weight:900;color:var(--green);">₭0</span>
+
+        <!-- Rows: label left, value right -->
+        <div id="rpv-row-0" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+          <span style="color:var(--text-dim);">ຍອດຝາກ</span>
+          <span id="rpv-val-0" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
         </div>
-        <div style="display:flex;gap:20px;margin-top:10px;font-size:12px;">
-          <div><span style="color:var(--text-dim);">ທຸລະກຳຝາກ</span><br><span id="rpv-cnt-dep" style="color:var(--green);font-weight:700;">0</span></div>
-          <div><span style="color:var(--text-dim);">ທຸລະກຳຖອນ</span><br><span id="rpv-cnt-wth" style="color:var(--red);font-weight:700;">0</span></div>
+        <div id="rpv-row-1" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+          <span style="color:var(--text-dim);">ຍອດຖອນ</span>
+          <span id="rpv-val-1" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
+        </div>
+        <div id="rpv-row-2" style="display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+          <span style="color:var(--text-dim);">ຄ່າທຳນຽມ / ລາງວັນ</span>
+          <span id="rpv-val-2" style="color:var(--gold3);font-weight:700;font-size:15px;">₭0</span>
+        </div>
+
+        <!-- Divider line (ຄືຮູບ BCEL) -->
+        <div style="height:1.5px;background:linear-gradient(90deg,rgba(68,170,255,0.6),rgba(68,170,255,0.1));margin:4px 0 2px;border-radius:2px;"></div>
+
+        <!-- ສ່ວນຕ່າງ row — shaded background -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 14px;background:rgba(255,255,255,0.04);border-radius:8px;margin-top:4px;font-size:15px;">
+          <span style="font-weight:600;color:var(--text-dim);">ສ່ວນຕ່າງ</span>
+          <span id="rpv-net" style="font-weight:900;color:var(--green);font-size:16px;">₭0</span>
+        </div>
+
+        <!-- ຈຳນວນທຸລະກຳ footer -->
+        <div style="display:flex;gap:24px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.05);font-size:12px;">
+          <div>
+            <div style="color:var(--text-faint);margin-bottom:3px;">ທຸລະກຳຝາກ</div>
+            <span id="rpv-cnt-dep" style="color:var(--green);font-weight:700;font-size:15px;">0</span>
+          </div>
+          <div>
+            <div style="color:var(--text-faint);margin-bottom:3px;">ທຸລະກຳຖອນ</div>
+            <span id="rpv-cnt-wth" style="color:var(--red);font-weight:700;font-size:15px;">0</span>
+          </div>
+          <div>
+            <div style="color:var(--text-faint);margin-bottom:3px;">Commission</div>
+            <span id="rpv-val-3" style="color:var(--blue);font-weight:700;font-size:13px;">₭0</span>
+          </div>
         </div>
       </div>
     </div>
@@ -1382,16 +1403,28 @@ function updateRevPreview(){
   const t   = getCommTier(amt);
   const cm  = amt * t.rate / 100;
   const net = dep - wth;
-  const vals = [fmt(dep), fmt(wth), fmt(prz), `${fmt(cm)} (${t.rate}%)`, fmt(amt)];
-  vals.forEach((v,i)=>{ const el=document.getElementById('rpv-val-'+i); if(el) el.textContent=v; });
+
+  // update rows 0=dep, 1=wth, 2=prz
+  const s = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  s('rpv-val-0', fmt(dep));
+  s('rpv-val-1', fmt(wth));
+  s('rpv-val-2', fmt(prz));
+  s('rpv-val-3', `${fmt(cm)} (${t.rate}%)`);
+
+  // ສ່ວນຕ່າງ
   const netEl = document.getElementById('rpv-net');
-  if(netEl){ netEl.textContent=fmt(net); netEl.style.color=net>=0?'var(--green)':'var(--red)'; }
-  // update tx counts from today's data + current input preview
-  const todayRevs = DB.revenues.filter(r=>r.date===today());
+  if(netEl){
+    netEl.textContent = fmt(net);
+    netEl.style.color = net>=0 ? 'var(--green)' : 'var(--red)';
+  }
+
+  // ຈຳນວນທຸລະກຳ
+  const selDate = document.getElementById('rv-date')?.value || today();
+  const dateRevs = DB.revenues.filter(r=>r.date===selDate);
   const depCnt = document.getElementById('rpv-cnt-dep');
   const wthCnt = document.getElementById('rpv-cnt-wth');
-  if(depCnt) depCnt.textContent = todayRevs.length + (amt>0?1:0);
-  if(wthCnt) wthCnt.textContent = todayRevs.filter(r=>r.withdraw>0).length + (wth>0?1:0);
+  if(depCnt) depCnt.textContent = dateRevs.length + (amt>0?1:0);
+  if(wthCnt) wthCnt.textContent = dateRevs.filter(r=>(r.withdraw||0)>0).length + (wth>0?1:0);
 }
 
 function addRev(){
@@ -1902,17 +1935,49 @@ function tryEndShift(){
       <div class="fgr"><label>ຍອດຄົງເຫຼືອ (₭)</label><input id="sr-bl" type="number" placeholder="0" min="0"></div>
     </div>
 
-    <!-- BCEL-style summary preview -->
-    <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,215,0,0.15);border-radius:10px;padding:14px;margin-bottom:12px;">
-      <div style="font-size:11px;color:var(--text-faint);letter-spacing:1px;margin-bottom:10px;">ຍອດເງິນ (Amount)</div>
-      ${[['ຍອດຝາກ','sp-dep','var(--green)'],['ຍອດຖອນ','sp-wth','var(--red)'],['ລາງວັນ','sp-prz','var(--gold3)'],['Commission','sp-comm','var(--blue)'],['ລາຍຮັບລວມ','sp-rev','var(--gold)']].map(([l,id,c])=>`
-        <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:12px;">
-          <span style="color:var(--text-dim);">${l}</span>
-          <span id="${id}" style="color:${c};font-weight:700;">₭0</span>
-        </div>`).join('')}
-      <div style="display:flex;justify-content:space-between;padding:9px 10px;background:rgba(255,215,0,0.06);border-radius:7px;margin-top:8px;font-size:13px;">
-        <span style="font-weight:700;">ສ່ວນຕ່າງ</span>
-        <span id="sp-net" style="font-weight:900;color:var(--green);">₭0</span>
+    <!-- BCEL Amount format -->
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:16px 18px;margin-bottom:12px;">
+      <!-- Title -->
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px;">
+        <span style="font-size:16px;">💰</span>
+        <span style="font-size:15px;font-weight:700;">ຍອດເງິນ (Amount)</span>
+      </div>
+
+      <!-- ຍອດຝາກ -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <span style="color:var(--text-dim);">ຍອດຝາກ</span>
+        <span id="sp-dep" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
+      </div>
+      <!-- ຍອດຖອນ -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <span style="color:var(--text-dim);">ຍອດຖອນ</span>
+        <span id="sp-wth" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
+      </div>
+      <!-- ຄ່າທຳນຽມ/ລາງວັນ -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:14px;">
+        <span style="color:var(--text-dim);">ຄ່າທຳນຽມ / ລາງວັນ</span>
+        <span id="sp-prz" style="color:var(--gold3);font-weight:700;font-size:15px;">₭0</span>
+      </div>
+
+      <!-- Divider ສີຟ້າ -->
+      <div style="height:1.5px;background:linear-gradient(90deg,rgba(68,170,255,0.7),rgba(68,170,255,0.1));margin:2px 0 4px;border-radius:2px;"></div>
+
+      <!-- ສ່ວນຕ່າງ — shaded -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:rgba(255,255,255,0.04);border-radius:8px;margin-top:4px;font-size:15px;">
+        <span style="font-weight:600;">ສ່ວນຕ່າງ</span>
+        <span id="sp-net" style="font-weight:900;color:var(--green);font-size:16px;">₭0</span>
+      </div>
+
+      <!-- Commission footer -->
+      <div style="display:flex;gap:24px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);font-size:12px;">
+        <div>
+          <div style="color:var(--text-faint);margin-bottom:2px;">Commission</div>
+          <span id="sp-comm" style="color:var(--blue);font-weight:700;">₭0</span>
+        </div>
+        <div>
+          <div style="color:var(--text-faint);margin-bottom:2px;">ລາຍຮັບລວມ</div>
+          <span id="sp-rev" style="color:var(--gold);font-weight:700;">₭0</span>
+        </div>
       </div>
     </div>
 
