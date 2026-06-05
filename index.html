@@ -847,7 +847,12 @@ function scoreColor(s){ return s>=80?'#00ff88':s>=60?'#FFD700':'#ff4455'; }
 // ============================================================
 // PAGE: DASHBOARD
 // ============================================================
-let _dbPeriod = 'week'; // day | week | month
+let _dbPeriod     = 'week'; // all | day | week | month
+let _dbFrom       = '';
+let _dbTo         = '';
+let _dbDaySelect  = '';
+let _dbWeekStart  = ''; // ISO date of chosen Monday
+let _dbMonthSel   = ''; // YYYY-MM
 
 function pgDashboard(){
   const now = new Date();
@@ -855,21 +860,46 @@ function pgDashboard(){
   document.getElementById('ct').innerHTML=`
   <div class="g20 ai">
 
-    <!-- HEADER + PERIOD TABS -->
-    <div class="ph" style="flex-wrap:wrap;gap:12px;">
+    <!-- HEADER + FILTER BAR -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
       <div>
         <div class="pt">4KHING ສູນຄວບຄຸມ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <div style="display:flex;gap:5px;">
-          ${[['day','ມື້ນີ້'],['week','ອາທິດ'],['month','ເດືອນ']].map(([k,l])=>`
-          <button id="dbtab-${k}" onclick="setDbPeriod('${k}')"
-            class="btn ${_dbPeriod===k?'btn-gold':'btn-outline'}"
-            style="font-size:11px;padding:6px 14px;">${l}</button>`).join('')}
-        </div>
+      <div style="display:flex;align-items:center;gap:6px;">
         <div class="lc" id="dclk" style="font-size:12px;"></div>
         <div style="color:var(--text-faint);font-size:10px;">${dStr}</div>
+      </div>
+    </div>
+
+    <!-- PILL FILTER BAR -->
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:rgba(255,215,0,0.04);border:1px solid rgba(255,215,0,0.14);border-radius:12px;padding:10px 14px;">
+      <span style="font-size:10px;color:var(--text-faint);letter-spacing:1px;margin-right:4px;">FILTER</span>
+      ${[['all','ທ້ອງໝົດ'],['day','ມື້'],['week','ອາທິດ'],['month','ເດືອນ']].map(([k,l])=>`
+        <button id="dbtab-${k}" onclick="setDbPeriod('${k}')"
+          style="border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;border:1px solid rgba(255,215,0,0.3);
+          background:${_dbPeriod===k?'var(--gold)':'rgba(255,215,0,0.07)'};
+          color:${_dbPeriod===k?'#000':'rgba(255,215,0,0.7)'};">${l}</button>`).join('')}
+
+      <!-- ມື້ picker -->
+      <div id="db-day-row" style="display:${_dbPeriod==='day'?'flex':'none'};align-items:center;gap:5px;">
+        <input type="date" id="db-day-input" value="${_dbDaySelect||today()}"
+          style="background:#0a0a00;border:1px solid rgba(255,215,0,0.35);border-radius:8px;color:var(--gold);padding:4px 10px;font-size:12px;width:155px;"
+          onchange="_dbDaySelect=this.value;renderDashboard()">
+      </div>
+
+      <!-- ອາທິດ picker (week-of input) -->
+      <div id="db-week-row" style="display:${_dbPeriod==='week'?'flex':'none'};align-items:center;gap:5px;">
+        <input type="week" id="db-week-input" value="${_dbWeekStart?isoWeekVal(_dbWeekStart):currentIsoWeek()}"
+          style="background:#0a0a00;border:1px solid rgba(255,215,0,0.35);border-radius:8px;color:var(--gold);padding:4px 10px;font-size:12px;width:165px;"
+          onchange="onDbWeekChange(this.value)">
+      </div>
+
+      <!-- ເດືອນ picker -->
+      <div id="db-month-row" style="display:${_dbPeriod==='month'?'flex':'none'};align-items:center;gap:5px;">
+        <input type="month" id="db-month-input" value="${_dbMonthSel||today().slice(0,7)}"
+          style="background:#0a0a00;border:1px solid rgba(255,215,0,0.35);border-radius:8px;color:var(--gold);padding:4px 10px;font-size:12px;width:150px;"
+          onchange="_dbMonthSel=this.value;renderDashboard()">
       </div>
     </div>
 
@@ -913,25 +943,98 @@ function pgDashboard(){
 
 function setDbPeriod(p){
   _dbPeriod = p;
-  ['day','week','month'].forEach(k=>{
+  ['all','day','week','month'].forEach(k=>{
     const el = document.getElementById('dbtab-'+k);
     if(!el) return;
-    el.className = 'btn '+(k===p?'btn-gold':'btn-outline');
-    el.style.cssText = 'font-size:11px;padding:6px 14px;';
+    el.style.background = k===p ? 'var(--gold)' : 'rgba(255,215,0,0.07)';
+    el.style.color      = k===p ? '#000' : 'rgba(255,215,0,0.7)';
   });
+  const dr  = document.getElementById('db-day-row');
+  const wr  = document.getElementById('db-week-row');
+  const mr  = document.getElementById('db-month-row');
+  if(dr) dr.style.display  = p==='day'   ? 'flex' : 'none';
+  if(wr) wr.style.display  = p==='week'  ? 'flex' : 'none';
+  if(mr) mr.style.display  = p==='month' ? 'flex' : 'none';
+  if(p==='day'   && !_dbDaySelect)  _dbDaySelect  = today();
+  if(p==='week'  && !_dbWeekStart)  _dbWeekStart  = getMondayOf(new Date());
+  if(p==='month' && !_dbMonthSel)   _dbMonthSel   = today().slice(0,7);
+  renderDashboard();
+}
+
+// ── week helpers ────────────────────────────────────────────
+function getMondayOf(d){
+  const dt = new Date(d);
+  const dow = dt.getDay()===0 ? 6 : dt.getDay()-1;
+  dt.setDate(dt.getDate()-dow);
+  return dt.toISOString().slice(0,10);
+}
+function getSundayOf(mondayStr){
+  const d = new Date(mondayStr);
+  d.setDate(d.getDate()+6);
+  return d.toISOString().slice(0,10);
+}
+function currentIsoWeek(){
+  // returns YYYY-Www for current week
+  const d = new Date();
+  const td = d.toISOString().slice(0,10);
+  const mon = getMondayOf(d);
+  const jan4 = new Date(d.getFullYear(),0,4);
+  const w = Math.ceil((((d-jan4)/86400000)+jan4.getDay()+1)/7);
+  return d.getFullYear()+'-W'+String(w).padStart(2,'0');
+}
+function isoWeekVal(mondayStr){
+  // convert YYYY-MM-DD monday → YYYY-Www for <input type=week>
+  const d = new Date(mondayStr);
+  const jan4 = new Date(d.getFullYear(),0,4);
+  const w = Math.ceil((((d-jan4)/86400000)+jan4.getDay()+1)/7);
+  return d.getFullYear()+'-W'+String(w).padStart(2,'0');
+}
+function onDbWeekChange(val){
+  // val = "YYYY-Www" → find Monday
+  if(!val) return;
+  const [yr,wStr] = val.split('-W');
+  const wn = parseInt(wStr);
+  // Jan 4 is always in week 1
+  const jan4 = new Date(parseInt(yr),0,4);
+  const dow4 = jan4.getDay()===0?6:jan4.getDay()-1;
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - dow4 + (wn-1)*7);
+  _dbWeekStart = monday.toISOString().slice(0,10);
   renderDashboard();
 }
 
 function getDbRange(){
-  const td = today();
+  const td  = today();
   const now = new Date();
-  if(_dbPeriod==='day') return {from:td, to:td, label:'ມື້ນີ້'};
-  if(_dbPeriod==='week'){
-    const dow = now.getDay()===0?6:now.getDay()-1;
-    const ws = new Date(now); ws.setDate(now.getDate()-dow);
-    return {from:ws.toISOString().slice(0,10), to:td, label:'ອາທິດນີ້'};
+  if(_dbPeriod==='all'){
+    const allDates = [...DB.revenues.map(r=>r.date||td),...DB.expenses.map(e=>e.date||td)].filter(Boolean).sort();
+    const from = allDates[0] || td.slice(0,4)+'-01-01';
+    return {from, to:td, label:'ທ້ອງໝົດ'};
   }
-  return {from:td.slice(0,7)+'-01', to:td, label:'ເດືອນນີ້'};
+  if(_dbPeriod==='day'){
+    const d  = _dbDaySelect || td;
+    const dn = new Date(d);
+    const label = d===td ? 'ມື້ນີ້' : `${dn.getDate()}/${dn.getMonth()+1}/${dn.getFullYear()}`;
+    return {from:d, to:d, label};
+  }
+  if(_dbPeriod==='week'){
+    const mon = _dbWeekStart || getMondayOf(now);
+    const sun = getSundayOf(mon);
+    const monD = new Date(mon);
+    const isCurrentWeek = mon === getMondayOf(now);
+    const label = isCurrentWeek ? 'ອາທິດນີ້'
+      : `${monD.getDate()}/${monD.getMonth()+1} – ${new Date(sun).getDate()}/${new Date(sun).getMonth()+1}`;
+    return {from:mon, to:sun>td?td:sun, label};
+  }
+  // month
+  const m  = _dbMonthSel || td.slice(0,7);
+  const [yr,mn] = m.split('-');
+  const lastDay = new Date(parseInt(yr), parseInt(mn), 0).getDate();
+  const mEnd = `${m}-${String(lastDay).padStart(2,'0')}`;
+  const isCurrentMonth = m === td.slice(0,7);
+  const monthNames = ['','ມັງກອນ','ກຸມພາ','ມີນາ','ເມສາ','ພຶດສະພາ','ມິຖຸນາ','ກໍລະກົດ','ສິງຫາ','ກັນຍາ','ຕຸລາ','ພະຈິກ','ທັນວາ'];
+  const label = isCurrentMonth ? 'ເດືອນນີ້' : `${monthNames[parseInt(mn)]} ${yr}`;
+  return {from:`${m}-01`, to:mEnd>td&&isCurrentMonth?td:mEnd, label};
 }
 
 function renderDashboard(){
