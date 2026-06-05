@@ -662,7 +662,8 @@ const totalExp = () => DB.expenses.reduce((a,b)=>a+b.amount,0);
 const totalRev = (filter) => {
   let arr = DB.revenues;
   if(filter) arr = arr.filter(filter);
-  return arr.reduce((a,b)=>a+b.amount,0);
+  // ສ່ວນຕ່າງ = ຝາກ − ຖອນ − ຄ່າທຳນຽມ
+  return arr.reduce((a,b)=>a+((b.deposit||0)-(b.withdraw||0)-(b.prize||0)),0);
 };
 const totalRevToday = () => totalRev(r=>r.date===today());
 const totalRevMonth = () => {
@@ -1489,8 +1490,9 @@ function updateRevPreview(){
 function addRev(){
   const date=document.getElementById('rv-date').value;
   const empSel=document.getElementById('rv-emp');
-  const empId=Number(empSel.value);
-  const empName=empSel.options[empSel.selectedIndex].dataset.name || empSel.options[empSel.selectedIndex].text;
+  const rawVal = empSel.value;
+  const empId = rawVal.startsWith('a_') ? rawVal : Number(rawVal);
+  const empName=empSel.options[empSel.selectedIndex].dataset.name || empSel.options[empSel.selectedIndex].text.replace(' (Admin)','');
   const deposit=Number(document.getElementById('rv-dep').value)||0;
   const withdraw=Number(document.getElementById('rv-wth').value)||0;
   const prize=Number(document.getElementById('rv-prz').value)||0;
@@ -1528,12 +1530,13 @@ function renderRevTable(q){
   if(rows.length===0){ tb.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text-faint);">ບໍ່ມີຂໍ້ມູນ</td></tr>`; return; }
 
   tb.innerHTML=rows.map(r=>{
-    const t=getCommTier(r.amount);
-    const comm=r.amount*t.rate/100;
+    const net=(r.deposit||0)-(r.withdraw||0)-(r.prize||0);
+    const t=getCommTier(net);
+    const comm=net*t.rate/100;
     return `<tr>
       <td class="td">${r.date}</td>
       <td class="tg bold">${r.empName}</td>
-      <td class="tgr">${fmt(r.amount)}</td>
+      <td class="tgr" title="ສ່ວນຕ່າງ = ຝາກ−ຖອນ−ຄ່າທຳນຽມ">${fmt(net)}</td>
       <td class="td">${fmt(r.deposit)}</td>
       <td class="td">${fmt(r.withdraw)}</td>
       <td class="td">${fmt(r.prize)}</td>
@@ -1543,8 +1546,8 @@ function renderRevTable(q){
     </tr>`;
   }).join('');
 
-  const total=rows.reduce((a,b)=>a+b.amount,0);
-  const totalComm=rows.reduce((a,b)=>a+b.amount*getCommTier(b.amount).rate/100,0);
+  const total=rows.reduce((a,b)=>a+((b.deposit||0)-(b.withdraw||0)-(b.prize||0)),0);
+  const totalComm=rows.reduce((a,b)=>{ const n=(b.deposit||0)-(b.withdraw||0)-(b.prize||0); return a+n*getCommTier(n).rate/100; },0);
   document.getElementById('rv-summary').innerHTML=`
   <div class="sum-row">
     <span class="td">ລວມ ${rows.length} ລາຍການ</span>
@@ -3053,10 +3056,29 @@ function pgPartner(){
       <div class="pt">ສ່ວນແບ່ງຫຸ້ນສ່ວນ</div>
       <button class="btn btn-gold" onclick="openPartnerForm(null)">+ ເພີ່ມຫຸ້ນສ່ວນ</button>
     </div>
-    <div class="card glow p20 sc" style="max-width:340px;">
-      <div class="sl">ກຳໄລສຸດທິທີ່ຈະແບ່ງ</div>
-      <div class="sv tg">${fmt(netProfit())}</div>
-      <div class="ss">ຫຼັງຫັກລາຍຈ່າຍ</div>
+    <div class="card glow p20" style="max-width:420px;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
+          <span style="color:var(--text-dim);">ສ່ວນຕ່າງລວມ</span>
+          <span class="tg bold">${fmt(totalRevMonth())}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
+          <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍ</span>
+          <span class="tr bold">− ${fmt(totalExp())}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
+          <span style="color:var(--text-dim);">ກຳໄລຫຼັງຈ່າຍ</span>
+          <span class="tg bold">${fmt(netProfit())}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
+          <span style="color:var(--text-dim);">ຄ່າຄຸ້ມຄອງລະບົບ (25%)</span>
+          <span style="color:var(--gold3);font-weight:700;">− ${fmt(netProfit()*0.25)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:15px;padding:8px 0;">
+          <span style="font-weight:800;">ກຳໄລທີ່ແທ້ຈິງ (ແບ່ງຫຸ້ນສ່ວນ)</span>
+          <span class="tgr" style="font-family:'Orbitron',monospace;font-size:16px;font-weight:900;">${fmt(netProfit()*0.75)}</span>
+        </div>
+      </div>
     </div>
     <div id="pwarn" class="hidden" style="background:rgba(255,68,85,0.1);border:1px solid rgba(255,68,85,0.28);border-radius:10px;padding:11px 16px;color:var(--red);font-size:13px;">⚠ ສ່ວນແບ່ງທັງໝົດ ≠ 100%</div>
     <div class="pgrid" id="pcards"></div>
@@ -3069,7 +3091,7 @@ function pgPartner(){
 
 function renderPartnerCards(){
   const el=document.getElementById('pcards'); if(!el) return;
-  const profit=netProfit();
+  const profit=netProfit()*0.75; // ຫັກຄ່າຄຸ້ມຄອງ 25% ກ່ອນແບ່ງ
   const total=DB.partners.reduce((a,b)=>a+b.share,0);
   const warn=document.getElementById('pwarn');
   if(warn) warn.classList.toggle('hidden',Math.round(total)===100);
