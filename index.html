@@ -281,7 +281,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div id="sb">
     <div class="brand">
       <div class="bi">👑</div>
-      <div><div class="bn">4king77</div><div class="bs">ລະບົບຄຸ້ມຄອງ</div></div>
+      <div><div class="bn">4king77</div><div class="bs">ສູນຄວບຄຸມ</div></div>
     </div>
     <nav id="snav"></nav>
     <div class="uinfo">
@@ -606,15 +606,16 @@ let DB = loadDataSync() || JSON.parse(JSON.stringify(DEFAULT));
 
 // Session (not persisted) — shiftActive/shiftStart/shiftLogId ARE persisted via SHIFT_KEY
 const SHIFT_KEY = '4king77_shift_v1';
-let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, shiftLogId:null, calcAmount:3000000, page:'dashboard' };
+let SESSION = { user:null, shiftActive:false, shiftStart:null, shiftElapsed:0, shiftInterval:null, shiftLogId:null, shiftOpenBal:0, calcAmount:3000000, page:'dashboard' };
 
 // ── Shift persistence helpers ─────────────────────────────────
 function saveShiftState(){
   if(SESSION.shiftActive && SESSION.user){
     localStorage.setItem(SHIFT_KEY, JSON.stringify({
-      username:    SESSION.user.username,
-      shiftStart:  SESSION.shiftStart,
-      shiftLogId:  SESSION.shiftLogId,
+      username:     SESSION.user.username,
+      shiftStart:   SESSION.shiftStart,
+      shiftLogId:   SESSION.shiftLogId,
+      shiftOpenBal: SESSION.shiftOpenBal||0,
     }));
   } else {
     localStorage.removeItem(SHIFT_KEY);
@@ -642,6 +643,7 @@ function restoreShiftIfNeeded(){
   SESSION.shiftActive  = true;
   SESSION.shiftStart   = start;
   SESSION.shiftLogId   = saved.shiftLogId || null;
+  SESSION.shiftOpenBal = saved.shiftOpenBal || 0;
   SESSION.shiftElapsed = Math.floor((Date.now() - start) / 1000);
   console.log('[SHIFT RESTORE] success! elapsed:', SESSION.shiftElapsed, 's');
   // ໝັ້ນໃຈ employee status = ONLINE
@@ -658,7 +660,10 @@ const uid = () => Date.now() + Math.floor(Math.random()*1000);
 const today = () => new Date().toISOString().slice(0,10);
 const nowTime = () => new Date().toTimeString().slice(0,5);
 
-const totalExp = () => DB.expenses.reduce((a,b)=>a+b.amount,0);
+// ລາຍຈ່າຍທັງໝົດ (ທຸກລາຍການ ທຸກເດືອນ)
+const totalExp      = () => DB.expenses.reduce((a,b)=>a+b.amount,0);
+// ລາຍຈ່າຍເດືອນນີ້ (match ກັບ totalRevMonth)
+const totalExpMonth = () => { const m=today().slice(0,7); return DB.expenses.filter(e=>(e.date||'').startsWith(m)).reduce((a,b)=>a+b.amount,0); };
 const totalRev = (filter) => {
   let arr = DB.revenues;
   if(filter) arr = arr.filter(filter);
@@ -673,7 +678,7 @@ const totalRevMonth = () => {
 // ກຳໄລສຸດທິການຂາຍ = ສ່ວນຕ່າງ × 75% (ຫັກຄ່າຄຸ້ມຄອງ 25%)
 const salesProfit  = () => totalRevMonth() * 0.75;
 // ກຳໄລສຸດທິທັງໝົດ = ກຳໄລການຂາຍ − ລາຍຈ່າຍທັງໝົດ
-const netProfit    = () => salesProfit() - totalExp();
+const netProfit    = () => salesProfit() - totalExpMonth();
 const getCommTier = amt => {
   const tiers = DB.commTiers;
   for(let i=tiers.length-1;i>=0;i--){
@@ -937,7 +942,7 @@ function pgDashboard(){
     <!-- HEADER + FILTER BAR -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
       <div>
-        <div class="pt">4king77 ລະບົບຄຸ້ມຄອງ</div>
+        <div class="pt">4king77 ສູນຄວບຄຸມ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -1165,7 +1170,7 @@ function renderDashboard(){
     <div class="card p20 sc" style="cursor:pointer;" onclick="navigate('reserve')"><div class="bgi">🏦</div>
       <div class="sl">ກຳໄລສຸດທິທັງໝົດ (ເດືອນ)</div>
       <div class="sv ${netAll>=0?'tgr':'tr'}">${fmt(netAll)}</div>
-      <div class="ss">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(expAll)}</div>
+      <div class="ss">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExpMonth())}</div>
       <div class="sbar" style="color:var(--green);"></div>
     </div>
     <div class="card p20 sc" style="cursor:pointer;border-color:rgba(68,170,255,0.3);" onclick="navigate('reserve')"><div class="bgi">🏦</div>
@@ -1348,7 +1353,7 @@ function pgRevenue(){
       <div class="card p20" style="border-left:4px solid var(--green);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📈 ກຳໄລສຸດທິ</div>
         <div style="font-size:22px;font-weight:900;color:var(--green);">₭ ${Number(netProfit()).toLocaleString()}</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExp())}</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExpMonth())}</div>
       </div>
       <div class="card p20" style="border-left:4px solid var(--blue);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📋 ທຸລະກຳ (ເດືອນ)</div>
@@ -1895,7 +1900,7 @@ function pgShift(){
         </div>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ເລີ່ມ</th><th>ສິ້ນສຸດ</th><th>ຊົ່ວໂມງ</th><th>ລາຍຮັບ</th><th>Export</th></tr></thead>
+        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ເລີ່ມ</th><th>ສິ້ນສຸດ</th><th>ຊົ່ວໂມງ</th><th>ເປີດ</th><th>ປິດ</th><th>ສ່ວນຕ່າງ</th><th>Export</th></tr></thead>
         <tbody id="shift-log-tbody"></tbody>
       </table></div>
       <div id="shift-log-sum"></div>
@@ -1921,19 +1926,23 @@ function renderShiftLogs(){
     return;
   }
 
-  tb.innerHTML = logs.map(s=>`<tr>
+  tb.innerHTML = logs.map(s=>{
+    const dep2 = (s.closeBalance!=null&&s.openBalance!=null) ? s.closeBalance-s.openBalance : null;
+    return `<tr>
     <td class="td fm" style="font-size:11px;">${s.date}</td>
     <td class="tg bold">${s.empName}</td>
     <td class="td">${s.startTime||'-'}</td>
     <td class="td">${s.endTime||'<span style="color:var(--green);font-size:10px;">ດຳເນີນ</span>'}</td>
     <td class="tgr">${s.hours?s.hours.toFixed(1)+'h':'-'}</td>
-    <td class="tg" style="font-weight:700;">${fmt(s.revenue||0)}</td>
+    <td class="td" style="font-size:11px;">${s.openBalance!=null?fmt(s.openBalance):'-'}</td>
+    <td class="td" style="font-size:11px;">${s.closeBalance!=null?fmt(s.closeBalance):'-'}</td>
+    <td class="tg" style="font-weight:700;">${s.revenue!=null?fmt(s.revenue):'-'}</td>
     <td>
       ${s.endTime
         ? `<button class="btn btn-blue" style="font-size:10px;padding:5px 10px;white-space:nowrap;" onclick="exportShiftImage(${s.id})">📸 ຮູບ</button>`
         : `<span style="font-size:10px;color:var(--text-faint);">ຍັງດຳເນີນ</span>`}
     </td>
-  </tr>`).join('');
+  </tr>`;}).join('');
 
   const totHours = logs.filter(s=>s.hours).reduce((a,b)=>a+(b.hours||0),0);
   const totRev   = logs.reduce((a,b)=>a+(b.revenue||0),0);
@@ -1959,16 +1968,39 @@ function addQuickRev(){
 }
 
 function startShift(){
+  // ຂໍ Opening Balance ກ່ອນ
+  showModal('▶ ເລີ່ມ Shift — ຍອດຍົກມາ',`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(0,255,136,0.05);border-radius:8px;margin-bottom:16px;">
+      <span style="font-size:22px;">👤</span>
+      <div style="font-size:14px;font-weight:700;">${SESSION.user.name}</div>
+    </div>
+    <div class="fgr" style="margin-bottom:6px;">
+      <label>ຍອດຍົກມາ / Opening Balance (₭)</label>
+      <input id="ob-val" type="number" placeholder="0" min="0"
+        style="font-size:18px;padding:12px 14px;text-align:right;"
+        oninput="this.style.borderColor='rgba(0,255,136,0.6)'">
+      <div style="font-size:11px;color:var(--text-faint);margin-top:4px;">ຍອດເງິນໃນລະບົບຕອນຕົ້ນກະ</div>
+    </div>`,
+    [{label:'▶ ເລີ່ມ Shift',cls:'btn btn-green',fn:confirmStartShift},
+     {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+  setTimeout(()=>{ const el=document.getElementById('ob-val'); if(el) el.focus(); },100);
+}
+
+function confirmStartShift(){
+  const openBal = Number(document.getElementById('ob-val')?.value)||0;
+  closeModal();
   SESSION.shiftActive=true;
   SESSION.shiftStart=Date.now()-SESSION.shiftElapsed*1000;
+  SESSION.shiftOpenBal=openBal;
   const e=DB.employees.find(x=>x.username===SESSION.user.username||x.name===SESSION.user.name);
   if(e){ e.status='ONLINE'; saveData(); }
   // record shift log start
   SESSION.shiftLogId=uid();
-  DB.shiftLogs.unshift({id:SESSION.shiftLogId,date:today(),empName:SESSION.user.name,empId:SESSION.user.id,startTime:nowTime(),endTime:null,hours:null,revenue:0});
-  addLog(SESSION.user.name,'ເລີ່ມ Shift','shift');
+  DB.shiftLogs.unshift({id:SESSION.shiftLogId,date:today(),empName:SESSION.user.name,empId:SESSION.user.id,startTime:nowTime(),endTime:null,hours:null,revenue:0,openBalance:openBal,closeBalance:null});
+  addLog(SESSION.user.name,`ເລີ່ມ Shift (ຍອດຍົກມາ: ${fmt(openBal)})`,'shift');
   saveData();
-  saveShiftState(); // persist across refresh/re-login
+  saveShiftState();
   pgShift();
 }
 
@@ -1992,11 +2024,22 @@ function tryEndShift(){
       </div>
     </div>
 
+    <!-- Opening Balance display -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:8px;margin-bottom:12px;font-size:13px;">
+      <span style="color:var(--text-dim);">ຍອດຍົກມາ (Opening Balance)</span>
+      <span style="color:var(--blue);font-weight:700;font-size:15px;">${fmt(SESSION.shiftOpenBal||0)}</span>
+    </div>
+
     <!-- INPUT GRID -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
-      <div class="fgr"><label>ຍອດເຕີມ (₭)</label><input id="sr-d" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
+      <div class="fgr" style="grid-column:span 2;">
+        <label style="color:var(--green);font-size:12px;letter-spacing:1px;">💰 ຍອດປິດ / Closing Balance (₭)</label>
+        <input id="sr-close" type="number" placeholder="0" min="0"
+          style="font-size:18px;padding:12px 14px;text-align:right;border-color:rgba(0,255,136,0.4);"
+          oninput="updateShiftPreview()">
+        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ຍອດເງິນໃນລະບົບຕອນສິ້ນກະ</div>
+      </div>
       <div class="fgr"><label>ຍອດຖອນ (₭)</label><input id="sr-w" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
-      <div class="fgr"><label>ກຳໄລ (₭)</label><input id="sr-r" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
       <div class="fgr"><label>ຄ່າທຳນຽມ (₭)</label><input id="sr-p" type="number" placeholder="0" min="0" oninput="updateShiftPreview()"></div>
       <!-- hidden -->
       <input type="hidden" id="sr-b" value="0">
@@ -2011,20 +2054,25 @@ function tryEndShift(){
         <span style="font-size:15px;font-weight:700;">ຍອດເງິນ (Amount)</span>
       </div>
 
-      <!-- ຍອດເຕີມ -->
+      <!-- ຍອດຍົກມາ -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
-        <span style="color:var(--text-dim);">ຍອດເຕີມ</span>
+        <span style="color:var(--text-dim);">ຍອດຍົກມາ (Opening)</span>
+        <span style="color:var(--blue);font-weight:700;font-size:15px;">${fmt(SESSION.shiftOpenBal||0)}</span>
+      </div>
+      <!-- ຍອດປິດ -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <span style="color:var(--text-dim);">ຍອດປິດ (Closing)</span>
+        <span id="sp-rev" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
+      </div>
+      <!-- ຍອດເຕີມ (ຄຳນວນ) -->
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
+        <span style="color:var(--text-dim);">ຍອດເຕີມ (ປິດ − ເປີດ)</span>
         <span id="sp-dep" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
       </div>
       <!-- ຍອດຖອນ -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
         <span style="color:var(--text-dim);">ຍອດຖອນ</span>
         <span id="sp-wth" style="color:var(--red);font-weight:700;font-size:15px;">₭0</span>
-      </div>
-      <!-- ກຳໄລ -->
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:14px;">
-        <span style="color:var(--text-dim);">ກຳໄລ</span>
-        <span id="sp-rev" style="color:var(--green);font-weight:700;font-size:15px;">₭0</span>
       </div>
       <!-- ຄ່າທຳນຽມ -->
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:14px;">
@@ -2062,34 +2110,38 @@ function tryEndShift(){
 }
 
 function updateShiftPreview(){
-  const dep = Number(document.getElementById('sr-d')?.value)||0;  // ຍອດເຕີມ
-  const wth = Number(document.getElementById('sr-w')?.value)||0;  // ຍອດຖອນ
-  const rev = Number(document.getElementById('sr-r')?.value)||0;  // ກຳໄລ
-  const prz = Number(document.getElementById('sr-p')?.value)||0;  // ຄ່າທຳນຽມ
-  const net = dep - wth - prz;
+  const openBal = SESSION.shiftOpenBal||0;
+  const close   = Number(document.getElementById('sr-close')?.value)||0;  // ຍອດປິດ
+  const wth     = Number(document.getElementById('sr-w')?.value)||0;       // ຍອດຖອນ
+  const prz     = Number(document.getElementById('sr-p')?.value)||0;       // ຄ່າທຳນຽມ
+  // ຍອດເຕີມ = ປິດ − ເປີດ (ຍອດທີ່ເຂົ້າລະຫວ່າງກະ)
+  const dep     = close - openBal;
+  // ສ່ວນຕ່າງ = ເຕີມ − ຖອນ − ຄ່າທຳນຽມ
+  const net     = dep - wth - prz;
 
   const s = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  s('sp-dep',  fmt(dep));
+  s('sp-dep',  fmt(Math.max(dep,0)));
   s('sp-wth',  fmt(wth));
-  s('sp-rev',  fmt(rev));
+  s('sp-rev',  fmt(close));
   s('sp-prz',  fmt(prz));
 
   const ne = document.getElementById('sp-net');
   if(ne){ ne.textContent=fmt(net); ne.style.color=net>=0?'var(--green)':'var(--red)'; }
 
-  // hide commission footer item
   const cm = document.getElementById('sp-comm');
   if(cm) cm.parentElement.style.display='none';
 }
 
 function submitShiftReport(){
-  const dep=Number(document.getElementById('sr-d').value)||0;   // ຍອດເຕີມ
-  const wth=Number(document.getElementById('sr-w').value)||0;   // ຍອດຖອນ
-  const rev=Number(document.getElementById('sr-r').value)||0;   // ກຳໄລ
-  const prz=Number(document.getElementById('sr-p').value)||0;   // ຄ່າທຳນຽມ
+  const openBal = SESSION.shiftOpenBal||0;
+  const close   = Number(document.getElementById('sr-close')?.value)||0;
+  const wth     = Number(document.getElementById('sr-w').value)||0;
+  const prz     = Number(document.getElementById('sr-p').value)||0;
+  const dep     = close - openBal;   // ຍອດເຕີມ = ປິດ − ເປີດ
+  const rev     = dep - wth - prz;   // ສ່ວນຕ່າງ
   const bon=0;
   const notes=document.getElementById('sr-n').value;
-  const amount=dep; // ລາຍຮັບຫຼັກ = ຍອດເຕີມ
+  const amount=Math.max(dep,0);
 
   // add revenue entry
   if(dep>0||rev>0){
@@ -2100,7 +2152,7 @@ function submitShiftReport(){
   const hours=(SESSION.shiftElapsed || Math.floor((Date.now()-SESSION.shiftStart)/1000))/3600;
   if(SESSION.shiftLogId){
     const idx=DB.shiftLogs.findIndex(s=>s.id===SESSION.shiftLogId);
-    if(idx>=0){ DB.shiftLogs[idx].endTime=nowTime(); DB.shiftLogs[idx].hours=hours; DB.shiftLogs[idx].revenue=rev; }
+    if(idx>=0){ DB.shiftLogs[idx].endTime=nowTime(); DB.shiftLogs[idx].hours=hours; DB.shiftLogs[idx].revenue=rev; DB.shiftLogs[idx].closeBalance=close; }
   }
 
   // update employee status
@@ -3067,8 +3119,8 @@ function pgPartner(){
           <span class="tg bold">${fmt(totalRevMonth())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
-          <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍ</span>
-          <span class="tr bold">− ${fmt(totalExp())}</span>
+          <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍ (ເດືອນນີ້)</span>
+          <span class="tr bold">− ${fmt(totalExpMonth())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
           <span style="color:var(--text-dim);">ກຳໄລສຸດທິການຂາຍ (×75%)</span>
@@ -3293,7 +3345,7 @@ function pgReports(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[
           ['ມື້',       ()=>[today(),today()]],
-          ['ມື້ວານ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
+          ['ມານວ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
           ['ອາທິດນີ້', ()=>{ const d=new Date();const dow=d.getDay()===0?6:d.getDay()-1;const ws=new Date(d);ws.setDate(d.getDate()-dow);return[ws.toISOString().slice(0,10),today()]; }],
           ['ເດືອນນີ້', ()=>[today().slice(0,7)+'-01',today()]],
           ['7 ມື້',    ()=>{ const d=new Date();d.setDate(d.getDate()-6);return[d.toISOString().slice(0,10),today()]; }],
