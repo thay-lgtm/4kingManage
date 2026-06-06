@@ -281,7 +281,7 @@ tr:hover td{background:rgba(255,215,0,0.022);}
   <div id="sb">
     <div class="brand">
       <div class="bi">👑</div>
-      <div><div class="bn">4king77</div><div class="bs">ລະບົບຄຸ້ມຄອງ</div></div>
+      <div><div class="bn">4king77</div><div class="bs">ສູນຄວບຄຸມ</div></div>
     </div>
     <nav id="snav"></nav>
     <div class="uinfo">
@@ -565,23 +565,10 @@ const DEFAULT = {
     {id:3,min:5000000,max:10000000,rate:7},
     {id:4,min:10000000,max:null,rate:10},
   ],
-  revenues:[
-    {id:1,date:'2026-05-22',empId:1,empName:'ພົມ',amount:8500000,deposit:6000000,withdraw:2000000,prize:500000,bonus:0,notes:'ວຽກກາງເຊົ້າ',shiftReport:false},
-    {id:2,date:'2026-05-22',empId:2,empName:'ນິກ',amount:12000000,deposit:9000000,withdraw:3000000,prize:800000,bonus:200000,notes:'ວຽກກາງເວັນ',shiftReport:false},
-    {id:3,date:'2026-05-21',empId:3,empName:'ດອກອໍ້',amount:9500000,deposit:7000000,withdraw:2500000,prize:400000,bonus:0,notes:'ວຽກກາງຄືນ',shiftReport:true},
-  ],
+  revenues:[],
   shiftLogs:[],
-  actLogs:[
-    {id:1,time:'14:32',user:'ພົມ',action:'ເລີ່ມ Shift ແລ້ວ',type:'shift',date:'2026-05-22'},
-    {id:2,time:'14:15',user:'ຜູ້ບໍລິຫານ',action:'ອັບເດດ Commission ແລ້ວ',type:'settings',date:'2026-05-22'},
-    {id:3,time:'13:48',user:'ນິກ',action:'ບັນທຶກລາຍຮັບ ₭12,000,000',type:'revenue',date:'2026-05-22'},
-    {id:4,time:'13:22',user:'ດອກອໍ້',action:'ສິ້ນສຸດ Shift ລາຍຮັບ ₭9,500,000',type:'shift',date:'2026-05-21'},
-  ],
-  notifications:[
-    {id:1,text:'ພົມ ເລີ່ມ Shift ກາງເຊົ້າ',type:'shift',read:false,time:'06:00'},
-    {id:2,text:'ນິກ ສົ່ງລາຍງານ Shift ແລ້ວ',type:'shift',read:false,time:'23:05'},
-    {id:3,text:'ລາຍຮັບ ຕ່ຳກວ່າເປົ້າ 30%',type:'warn',read:false,time:'20:00'},
-  ],
+  actLogs:[],
+  notifications:[],
   settings:{
     monthTarget:150000000,
     dailyTarget:5000000,
@@ -628,6 +615,31 @@ function loadShiftState(){
     if(!raw) return null;
     return JSON.parse(raw);
   }catch(e){ return null; }
+}
+
+function autoFixStaleShifts(){
+  // Shift ຄ້າງ = endTime null ແຕ່ເປີດໄວ້ > 24 ຊົ່ວໂມງ (ບໍ່ແມ່ນຂອງ session ນີ້)
+  const now = Date.now();
+  const saved = loadShiftState();
+  const activeId = saved ? saved.shiftLogId : null;
+
+  let fixed = 0;
+  DB.shiftLogs.forEach(s => {
+    if(s.endTime) return; // ປິດແລ້ວ OK
+    if(s.id === activeId) return; // session ປັດຈຸບັນ OK
+    // ຄຳນວນ age ຈາກ date + startTime
+    try{
+      const dt = new Date(s.date + 'T' + (s.startTime||'00:00') + ':00');
+      const age = (now - dt.getTime()) / 3600000; // hours
+      if(age > 24){
+        s.endTime  = s.startTime || '00:00'; // ປິດດ້ວຍ startTime (ບໍ່ຮູ້ closing)
+        s.hours    = 0;
+        s.staleAuto = true; // flag ວ່າ auto-closed
+        fixed++;
+      }
+    }catch(e){}
+  });
+  if(fixed > 0){ saveData(); console.log('[SHIFT] auto-closed', fixed, 'stale shifts'); }
 }
 
 function restoreShiftIfNeeded(){
@@ -773,6 +785,7 @@ async function doLogin(){
     addLog(user.name,'ເຂົ້າສູ່ລະບົບ','login');
     buildNav();
     updateBadge();
+    autoFixStaleShifts();     // ລ້າງ shift ຄ້າງ > 24h
     restoreShiftIfNeeded(); // ກູ້ Shift ທີ່ຍັງດຳເນີນຢູ່
     navigate('dashboard');
     startPolling(); // ເລີ່ມ Real-Time sync
@@ -942,7 +955,7 @@ function pgDashboard(){
     <!-- HEADER + FILTER BAR -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
       <div>
-        <div class="pt">4king77 ລະບົບຄຸ້ມຄອງ</div>
+        <div class="pt">4king77 ສູນຄວບຄຸມ</div>
         <div style="color:var(--text-faint);font-size:10px;letter-spacing:1px;margin-top:3px;">ລະບົບຄຸ້ມຄອງລາຍຮັບ Premium Gaming</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
@@ -1900,7 +1913,7 @@ function pgShift(){
         </div>
       </div>
       <div class="tw"><table>
-        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ເລີ່ມ</th><th>ສິ້ນສຸດ</th><th>ຊົ່ວໂມງ</th><th>ເປີດ</th><th>ປິດ</th><th>ສ່ວນຕ່າງ</th><th>Export</th></tr></thead>
+        <thead><tr><th>ວັນທີ</th><th>ພະນັກງານ</th><th>ເລີ່ມ</th><th>ສິ້ນສຸດ</th><th>ຊົ່ວໂມງ</th><th>ເປີດ</th><th>ປິດ</th><th>ສ່ວນຕ່າງ</th><th>Export</th>${SESSION.user.role==='admin'?'<th>Admin</th>':''}</tr></thead>
         <tbody id="shift-log-tbody"></tbody>
       </table></div>
       <div id="shift-log-sum"></div>
@@ -1932,7 +1945,7 @@ function renderShiftLogs(){
     <td class="td fm" style="font-size:11px;">${s.date}</td>
     <td class="tg bold">${s.empName}</td>
     <td class="td">${s.startTime||'-'}</td>
-    <td class="td">${s.endTime||'<span style="color:var(--green);font-size:10px;">ດຳເນີນ</span>'}</td>
+    <td class="td">${s.endTime ? s.endTime : s.staleAuto ? '<span style="color:var(--red);font-size:10px;">ຄ້າງ(auto)</span>' : '<span style="color:var(--green);font-size:10px;">ດຳເນີນ</span>'}</td>
     <td class="tgr">${s.hours?s.hours.toFixed(1)+'h':'-'}</td>
     <td class="td" style="font-size:11px;">${s.openBalance!=null?fmt(s.openBalance):'-'}</td>
     <td class="td" style="font-size:11px;">${s.closeBalance!=null?fmt(s.closeBalance):'-'}</td>
@@ -1940,8 +1953,12 @@ function renderShiftLogs(){
     <td>
       ${s.endTime
         ? `<button class="btn btn-blue" style="font-size:10px;padding:5px 10px;white-space:nowrap;" onclick="exportShiftImage(${s.id})">📸 ຮູບ</button>`
-        : `<span style="font-size:10px;color:var(--text-faint);">ຍັງດຳເນີນ</span>`}
+        : `<span style="font-size:10px;color:var(--green);">ດຳເນີນ</span>`}
     </td>
+    ${isAdmin ? `<td style="white-space:nowrap;">
+      <button class="btn" style="font-size:10px;padding:4px 8px;margin-right:3px;border-color:rgba(255,165,0,0.5);color:var(--gold2);" onclick="adminEditShift('${s.id}')">✏ແກ້</button>
+      <button class="btn btn-red" style="font-size:10px;padding:4px 8px;" onclick="adminDeleteShift('${s.id}')">✕ລົບ</button>
+    </td>` : ''}
   </tr>`;}).join('');
 
   const totHours = logs.filter(s=>s.hours).reduce((a,b)=>a+(b.hours||0),0);
@@ -1990,6 +2007,32 @@ function startShift(){
 function confirmStartShift(){
   const openBal = Number(document.getElementById('ob-val')?.value)||0;
   closeModal();
+
+  // ⚠ ກວດ Shift ຄ້າງ — ຫ້າມເປີດຊ້ຳ
+  const openShift = DB.shiftLogs.find(s => s.empId === SESSION.user.id && !s.endTime);
+  if(openShift){
+    showModal('⚠ ມີ Shift ຄ້າງຢູ່',`
+      <div style="text-align:center;padding:10px 0 18px;">
+        <div style="font-size:40px;margin-bottom:8px;">⚠️</div>
+        <div style="font-size:14px;color:var(--text-dim);margin-bottom:12px;">ທ່ານມີ Shift ທີ່ຍັງບໍ່ໄດ້ປິດ</div>
+        <div style="background:rgba(255,68,85,0.08);border:1px solid rgba(255,68,85,0.25);border-radius:10px;padding:12px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:var(--text-dim);">ວັນທີ</span>
+            <span>${openShift.date} ${openShift.startTime}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--text-dim);">ID</span>
+            <span style="color:var(--gold);font-size:10px;">#${openShift.id}</span>
+          </div>
+        </div>
+        <div style="margin-top:14px;font-size:11px;color:var(--text-dim);">ຕ້ອງປິດ Shift ເກົ່າກ່ອນ ຈື່ງເລີ່ມໃໝ່ໄດ້</div>
+      </div>`,
+      [{label:'◀ ກັບໄປປິດ Shift',cls:'btn btn-gold',fn:closeModal},
+       {label:'🗑 ລຶບ Shift ຄ້າງ & ເລີ່ມໃໝ່',cls:'btn btn-red',fn:()=>{ closeModal(); forceCloseStaleShift(openShift.id, openBal); }}]
+    );
+    return;
+  }
+
   SESSION.shiftActive=true;
   SESSION.shiftStart=Date.now()-SESSION.shiftElapsed*1000;
   SESSION.shiftOpenBal=openBal;
@@ -1999,6 +2042,41 @@ function confirmStartShift(){
   SESSION.shiftLogId=uid();
   DB.shiftLogs.unshift({id:SESSION.shiftLogId,date:today(),empName:SESSION.user.name,empId:SESSION.user.id,startTime:nowTime(),endTime:null,hours:null,revenue:0,openBalance:openBal,closeBalance:null});
   addLog(SESSION.user.name,`ເລີ່ມ Shift (ຍອດຍົກມາ: ${fmt(openBal)})`,'shift');
+  saveData();
+  saveShiftState();
+  pgShift();
+}
+
+function forceCloseStaleShift(staleId, newOpenBal){
+  // ລຶບ shift ຄ້າງອອກ
+  DB.shiftLogs = DB.shiftLogs.filter(s => s.id !== staleId);
+  addLog(SESSION.user.name, 'ລຶບ Shift ຄ້າງ #'+staleId, 'shift');
+  saveData();
+  localStorage.removeItem(SHIFT_KEY);
+  SESSION.shiftActive  = false;
+  SESSION.shiftElapsed = 0;
+  SESSION.shiftLogId   = null;
+  SESSION.shiftOpenBal = 0;
+  // ເລີ່ມ shift ໃໝ່
+  document.getElementById('ob-val') // ob-val ອາດຫາຍໄປແລ້ວ ສ້າງ input ໃໝ່ໂດຍກົງ
+  const fakeInput = { value: String(newOpenBal) };
+  const _orig = document.getElementById.bind(document);
+  const _patch = (id) => id === 'ob-val' ? fakeInput : _orig(id);
+  const _get = document.getElementById;
+  document.getElementById = _patch;
+  confirmStartShift_direct(newOpenBal);
+  document.getElementById = _get;
+}
+
+function confirmStartShift_direct(openBal){
+  SESSION.shiftActive  = true;
+  SESSION.shiftStart   = Date.now() - SESSION.shiftElapsed*1000;
+  SESSION.shiftOpenBal = openBal;
+  const e = DB.employees.find(x=>x.username===SESSION.user.username||x.name===SESSION.user.name);
+  if(e){ e.status='ONLINE'; saveData(); }
+  SESSION.shiftLogId = uid();
+  DB.shiftLogs.unshift({id:SESSION.shiftLogId,date:today(),empName:SESSION.user.name,empId:SESSION.user.id,startTime:nowTime(),endTime:null,hours:null,revenue:0,openBalance:openBal,closeBalance:null});
+  addLog(SESSION.user.name,`ເລີ່ມ Shift ໃໝ່ (ຍອດຍົກມາ: ${fmt(openBal)})`,'shift');
   saveData();
   saveShiftState();
   pgShift();
@@ -2139,6 +2217,29 @@ function submitShiftReport(){
   const prz     = Number(document.getElementById('sr-p').value)||0;
   const dep     = close - openBal;   // ຍອດເຕີມ = ປິດ − ເປີດ
   const rev     = dep - wth - prz;   // ສ່ວນຕ່າງ
+
+  // ⚠ ສ່ວນຕ່າງຕິດລົບ = ລູກຄ້າຖອນຫຼາຍກວ່າຝາກ → ຢືນຢັນກ່ອນ
+  if(rev < 0 && !window._shiftNegConfirmed){
+    window._shiftNegConfirmed = true;
+    showModal('⚠ ສ່ວນຕ່າງຕິດລົບ',`
+      <div style="text-align:center;padding:10px 0 18px;">
+        <div style="font-size:42px;margin-bottom:8px;">📉</div>
+        <div style="font-size:22px;font-weight:900;color:var(--red);margin-bottom:6px;">${fmt(rev)}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">ລູກຄ້າຖອນຫຼາຍກວ່າຝາກໃນກະນີ້</div>
+        <div style="display:flex;flex-direction:column;gap:6px;background:rgba(255,68,85,0.06);border:1px solid rgba(255,68,85,0.2);border-radius:10px;padding:12px;font-size:12px;text-align:left;">
+          <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-dim);">ຍອດເຕີມ</span><span style="color:var(--green);">${fmt(Math.max(dep,0))}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-dim);">ຍອດຖອນ</span><span style="color:var(--red);">− ${fmt(wth)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-dim);">ຄ່າທຳນຽມ</span><span style="color:var(--gold3);">− ${fmt(prz)}</span></div>
+          <div style="border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding-top:8px;display:flex;justify-content:space-between;font-weight:700;"><span>ສ່ວນຕ່າງ</span><span style="color:var(--red);">${fmt(rev)}</span></div>
+        </div>
+        <div style="margin-top:14px;font-size:12px;color:var(--text-dim);">ກວດຄືນຕົວເລກຖືກຕ້ອງແລ້ວໃຊ່ບໍ່?</div>
+      </div>`,
+      [{label:'✓ ຖືກຕ້ອງ ດຳເນີນຕໍ່',cls:'btn btn-red',fn:()=>{ closeModal(); submitShiftReport(); }},
+       {label:'◀ ກັບໄປແກ້ໄຂ',cls:'btn btn-outline',fn:()=>{ window._shiftNegConfirmed=false; closeModal(); tryEndShift(); }}]
+    );
+    return;
+  }
+  window._shiftNegConfirmed = false;
   const bon=0;
   const notes=document.getElementById('sr-n').value;
   const amount=Math.max(dep,0);
@@ -2174,6 +2275,121 @@ function submitShiftReport(){
 // ============================================================
 // SHIFT EXPORT — ສ້າງ Slip ເປັນຮູບ PNG
 // ============================================================
+
+function adminDeleteShift(shiftId){
+  const s = DB.shiftLogs.find(x=>String(x.id)===String(shiftId));
+  if(!s) return;
+  showModal('🗑 ລົບ Shift',`
+    <div style="text-align:center;padding:8px 0 16px;">
+      <div style="font-size:36px;margin-bottom:8px;">🗑</div>
+      <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px;">ຢືນຢັນລົບ Shift ນີ້?</div>
+      <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:10px;font-size:12px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-dim);">ພະນັກງານ</span><span class="tg bold">${s.empName}</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--text-dim);">ວັນທີ</span><span>${s.date}</span></div>
+        <div style="display:flex;justify-content:space-between;"><span style="color:var(--text-dim);">ສະຖານະ</span><span style="color:${s.endTime?'var(--green)':'var(--red)'};">${s.endTime?'ປິດແລ້ວ':'ຍັງດຳເນີນ ⚠'}</span></div>
+      </div>
+    </div>`,
+    [{label:'🗑 ຢືນຢັນລົບ',cls:'btn btn-red',fn:()=>{
+      // ຖ້າເປັນ shift ຂອງ session ທີ່ກຳລັງດຳເນີນ → reset
+      if(String(s.id)===String(SESSION.shiftLogId)){
+        if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
+        SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null; SESSION.shiftOpenBal=0;
+        localStorage.removeItem(SHIFT_KEY);
+        // reset employee status
+        const emp=DB.employees.find(x=>x.username===s.empName||x.name===s.empName);
+        if(emp){ emp.status='OFFLINE'; }
+      }
+      DB.shiftLogs=DB.shiftLogs.filter(x=>String(x.id)!==String(shiftId));
+      addLog(SESSION.user.name,'Admin ລົບ Shift ຂອງ '+s.empName+' ('+s.date+')','shift');
+      saveData();
+      closeModal();
+      showToast('ລົບ Shift ສຳເລັດ');
+      renderShiftLogs();
+    }},
+    {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
+
+function adminEditShift(shiftId){
+  const s = DB.shiftLogs.find(x=>String(x.id)===String(shiftId));
+  if(!s) return;
+  showModal('✏ ແກ້ໄຂ Shift — '+s.empName,`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="fgr">
+        <label>ວັນທີ</label>
+        <input id="es-date" type="date" value="${s.date||''}">
+      </div>
+      <div class="fgr">
+        <label>ພະນັກງານ</label>
+        <input id="es-emp" type="text" value="${s.empName||''}" readonly style="opacity:0.6;">
+      </div>
+      <div class="fgr">
+        <label>ເວລາເລີ່ມ</label>
+        <input id="es-start" type="time" value="${s.startTime||''}">
+      </div>
+      <div class="fgr">
+        <label>ເວລາສິ້ນສຸດ</label>
+        <input id="es-end" type="time" value="${s.endTime||''}">
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px;">ວ່າງ = ຍັງດຳເນີນ</div>
+      </div>
+      <div class="fgr">
+        <label>ຍອດຍົກມາ (₭)</label>
+        <input id="es-open" type="number" value="${s.openBalance??0}" min="0">
+      </div>
+      <div class="fgr">
+        <label>ຍອດປິດ (₭)</label>
+        <input id="es-close" type="number" value="${s.closeBalance??0}" min="0">
+        <div style="font-size:10px;color:var(--text-faint);margin-top:3px;">ວ່າງ = ຍັງບໍ່ຮູ້</div>
+      </div>
+    </div>
+    <div class="fgr" style="grid-column:span 2;">
+      <label>ໝາຍເຫດ</label>
+      <input id="es-note" type="text" value="${s.notes||''}" placeholder="ໝາຍເຫດ (ຖ້າມີ)">
+    </div>`,
+    [{label:'💾 ບັນທຶກ',cls:'btn btn-gold',fn:()=>{
+      const date  = document.getElementById('es-date').value || s.date;
+      const start = document.getElementById('es-start').value || s.startTime;
+      const end   = document.getElementById('es-end').value || null;
+      const open  = Number(document.getElementById('es-open').value)||0;
+      const close = document.getElementById('es-close').value ? Number(document.getElementById('es-close').value) : null;
+      const note  = document.getElementById('es-note').value;
+
+      // ຄຳນວນ hours & revenue
+      let hours = s.hours||0;
+      if(start && end){
+        const [sh,sm]=start.split(':').map(Number);
+        const [eh,em]=end.split(':').map(Number);
+        hours = ((eh*60+em)-(sh*60+sm))/60;
+        if(hours<0) hours+=24;
+      }
+      const dep = (close!=null && open!=null) ? close-open : 0;
+      const rev = s.revenue ?? dep;
+
+      const idx = DB.shiftLogs.findIndex(x=>String(x.id)===String(shiftId));
+      if(idx>=0){
+        DB.shiftLogs[idx] = {...DB.shiftLogs[idx], date, startTime:start, endTime:end||null,
+          hours: end?hours:null, openBalance:open, closeBalance:close, revenue:rev, notes:note,
+          staleAuto: end ? false : DB.shiftLogs[idx].staleAuto };
+      }
+
+      // ຖ້າ admin ໃສ່ endTime ໃຫ້ Shift ທີ່ຄ້າງ → reset session ດ້ວຍ
+      if(end && String(shiftId)===String(SESSION.shiftLogId)){
+        if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
+        SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null; SESSION.shiftOpenBal=0;
+        localStorage.removeItem(SHIFT_KEY);
+        const emp=DB.employees.find(x=>x.username===s.empName||x.name===s.empName);
+        if(emp){ emp.status='OFFLINE'; }
+      }
+
+      addLog(SESSION.user.name,'Admin ແກ້ໄຂ Shift ຂອງ '+s.empName+' ('+date+')','shift');
+      saveData();
+      closeModal();
+      showToast('ແກ້ໄຂ Shift ສຳເລັດ');
+      renderShiftLogs();
+    }},
+    {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
 
 function exportShiftImage(shiftId){
   const s = DB.shiftLogs.find(x=>x.id===shiftId);
@@ -3345,7 +3561,7 @@ function pgReports(){
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${[
           ['ມື້',       ()=>[today(),today()]],
-          ['ມື້ວານ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
+          ['ມານວ',      ()=>{ const d=new Date();d.setDate(d.getDate()-1);const s=d.toISOString().slice(0,10);return[s,s]; }],
           ['ອາທິດນີ້', ()=>{ const d=new Date();const dow=d.getDay()===0?6:d.getDay()-1;const ws=new Date(d);ws.setDate(d.getDate()-dow);return[ws.toISOString().slice(0,10),today()]; }],
           ['ເດືອນນີ້', ()=>[today().slice(0,7)+'-01',today()]],
           ['7 ມື້',    ()=>{ const d=new Date();d.setDate(d.getDate()-6);return[d.toISOString().slice(0,10),today()]; }],
@@ -3771,6 +3987,32 @@ function clearLogs(){ if(!confirm('ລ້າງ Log ທັງໝົດ?')) retur
 // ============================================================
 // PAGE: SETTINGS
 // ============================================================
+function resetAllData(){
+  showModal('🗑 Reset ຂໍ້ມູນທັງໝົດ',`
+    <div style="text-align:center;padding:10px 0;">
+      <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+      <div style="font-size:14px;color:var(--red);font-weight:700;margin-bottom:8px;">ລຶບຂໍ້ມູນທັງໝົດ!</div>
+      <div style="font-size:12px;color:var(--text-dim);">ລາຍຮັບ, Shift logs, ການແຈ້ງເຕືອນ, Activity logs<br>ຈະຖືກລຶບທັງໝົດ ບໍ່ສາມາດກູ້ຄືນໄດ້</div>
+    </div>`,
+    [{label:'🗑 ຢືນຢັນ Reset',cls:'btn btn-red',fn:()=>{
+      DB.revenues      = [];
+      DB.shiftLogs     = [];
+      DB.actLogs       = [];
+      DB.notifications = [];
+      // reset employee status
+      DB.employees.forEach(e=>{ e.status='OFFLINE'; });
+      saveData();
+      localStorage.removeItem(SHIFT_KEY);
+      SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null; SESSION.shiftOpenBal=0;
+      if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
+      closeModal();
+      showToast('Reset ຂໍ້ມູນສຳເລັດ ✓');
+      navigate('dashboard');
+    }},
+    {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
+
 function pgSettings(){
   const fbStatus = isFirebaseConfigured()
     ? '<span style="color:var(--green);">🟢 ເຊື່ອມຕໍ່ແລ້ວ — Real-Time LIVE</span>'
