@@ -690,7 +690,7 @@ const totalRevMonth = () => {
 // ກຳໄລສຸດທິການຂາຍ = ສ່ວນຕ່າງ × 75% (ຫັກຄ່າຄຸ້ມຄອງ 25%)
 const salesProfit  = () => totalRevMonth() * 0.75;
 // ກຳໄລສຸດທິທັງໝົດ = ກຳໄລການຂາຍ − ລາຍຈ່າຍທັງໝົດ
-const netProfit    = () => salesProfit() - totalExpMonth();
+const netProfit    = () => salesProfit() - totalExp(); // ລາຍຈ່າຍທຸກລາຍການ
 const getCommTier = amt => {
   const tiers = DB.commTiers;
   for(let i=tiers.length-1;i>=0;i--){
@@ -1183,7 +1183,7 @@ function renderDashboard(){
     <div class="card p20 sc" style="cursor:pointer;" onclick="navigate('reserve')"><div class="bgi">🏦</div>
       <div class="sl">ກຳໄລສຸດທິທັງໝົດ (ເດືອນ)</div>
       <div class="sv ${netAll>=0?'tgr':'tr'}">${fmt(netAll)}</div>
-      <div class="ss">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExpMonth())}</div>
+      <div class="ss">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExp())}</div>
       <div class="sbar" style="color:var(--green);"></div>
     </div>
     <div class="card p20 sc" style="cursor:pointer;border-color:rgba(68,170,255,0.3);" onclick="navigate('reserve')"><div class="bgi">🏦</div>
@@ -1366,7 +1366,7 @@ function pgRevenue(){
       <div class="card p20" style="border-left:4px solid var(--green);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📈 ກຳໄລສຸດທິ</div>
         <div style="font-size:22px;font-weight:900;color:var(--green);">₭ ${Number(netProfit()).toLocaleString()}</div>
-        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExpMonth())}</div>
+        <div style="font-size:11px;color:var(--text-faint);margin-top:3px;">ການຂາຍ ${fmt(salesProfit())} − ຈ່າຍ ${fmt(totalExp())}</div>
       </div>
       <div class="card p20" style="border-left:4px solid var(--blue);">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">📋 ທຸລະກຳ (ເດືອນ)</div>
@@ -3335,8 +3335,8 @@ function pgPartner(){
           <span class="tg bold">${fmt(totalRevMonth())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
-          <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍ (ເດືອນນີ້)</span>
-          <span class="tr bold">− ${fmt(totalExpMonth())}</span>
+          <span style="color:var(--text-dim);">ຫັກລາຍຈ່າຍທັງໝົດ</span>
+          <span class="tr bold">− ${fmt(totalExp())}</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,215,0,0.1);">
           <span style="color:var(--text-dim);">ກຳໄລສຸດທິການຂາຍ (×75%)</span>
