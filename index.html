@@ -4103,6 +4103,27 @@ function clearLogs(){ if(!confirm('ລ້າງ Log ທັງໝົດ?')) retur
 // ============================================================
 // PAGE: SETTINGS
 // ============================================================
+function deleteAllRevenues(){
+  const count = DB.revenues.length;
+  if(count===0){ showToast('ບໍ່ມີຂໍ້ມູນລາຍຮັບໃຫ້ລຶບ'); return; }
+  showModal('🗑 ລຶບຂໍ້ມູນລາຍຮັບທັງໝົດ',`
+    <div style="text-align:center;padding:10px 0;">
+      <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+      <div style="font-size:14px;color:var(--red);font-weight:700;margin-bottom:8px;">ຈະລຶບລາຍຮັບທັງໝົດ ${count} ລາຍການ!</div>
+      <div style="font-size:12px;color:var(--text-dim);">ຂໍ້ມູນລາຍຮັບທຸກເດືອນ ທຸກປີ ຈະຖືກລຶບຖາວອນ<br>Shift logs, ລາຍຈ່າຍ, ພະນັກງານ ຈະບໍ່ຖືກກະທົບ — ບໍ່ສາມາດກູ້ຄືນໄດ້</div>
+    </div>`,
+    [{label:'🗑 ຢືນຢັນລຶບທັງໝົດ',cls:'btn btn-red',fn:()=>{
+      DB.revenues = [];
+      saveData();
+      addLog(SESSION.user.name, `ລຶບຂໍ້ມູນລາຍຮັບທັງໝົດ (${count} ລາຍການ)`, 'settings');
+      closeModal();
+      showToast(`ລຶບຂໍ້ມູນລາຍຮັບທັງໝົດ ສຳເລັດ (${count} ລາຍການ) ✓`);
+      navigate('settings');
+    }},
+    {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
+
 function resetMonthData(){
   const monthVal = document.getElementById('reset-month-val')?.value || today().slice(0,7);
   showModal('🗑 Reset ຂໍ້ມູນລາຍເດືອນ',`
@@ -4254,6 +4275,12 @@ function pgSettings(){
         </div>
         <button class="btn btn-red" onclick="resetMonthData()" style="font-size:12px;">🗑 Reset ເດືອນນີ້</button>
       </div>
+    </div>
+
+    <div class="card p24" style="border-color:rgba(255,68,85,0.3);">
+      <div class="st" style="color:var(--red);">🗑 ລຶບຂໍ້ມູນລາຍຮັບທັງໝົດ</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:1.7;">ລຶບປະຫວັດ "ລາຍຮັບ" ທັງໝົດ (ທຸກເດືອນ, ທຸກປີ) ອອກຈາກລະບົບ — Shift logs, ລາຍຈ່າຍ, ພະນັກງານ ຈະບໍ່ຖືກກະທົບ. ບໍ່ສາມາດກູ້ຄືນໄດ້.</div>
+      <button class="btn btn-red" onclick="deleteAllRevenues()" style="font-size:12px;">🗑 ລຶບລາຍຮັບທັງໝົດ</button>
     </div>
 
     <div class="card p24">
