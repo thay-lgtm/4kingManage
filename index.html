@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>4king77 - ລະບົບຄຸ້ມຄອງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <style>
 :root{
   --gold:#FFD700;--gold2:#FFA500;--gold3:#FF8C00;
@@ -806,9 +807,10 @@ function doLogout(){
   // ຖ້າ Shift ບໍ່ໄດ້ດຳເນີນ → ລຶບ key ອອກ
   if(SESSION.shiftActive && SESSION.user){
     const shiftData = {
-      username:   SESSION.user.username,
-      shiftStart: SESSION.shiftStart,
-      shiftLogId: SESSION.shiftLogId,
+      username:     SESSION.user.username,
+      shiftStart:   SESSION.shiftStart,
+      shiftLogId:   SESSION.shiftLogId,
+      shiftOpenBal: SESSION.shiftOpenBal||0,
     };
     localStorage.setItem(SHIFT_KEY, JSON.stringify(shiftData));
     console.log('[SHIFT SAVE on logout]', shiftData);
@@ -2166,18 +2168,6 @@ function tryEndShift(){
         <span style="font-weight:600;">ສ່ວນຕ່າງ</span>
         <span id="sp-net" style="font-weight:900;color:var(--green);font-size:16px;">₭0</span>
       </div>
-
-      <!-- Commission footer -->
-      <div style="display:flex;gap:24px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.05);font-size:12px;">
-        <div>
-          <div style="color:var(--text-faint);margin-bottom:2px;">Commission</div>
-          <span id="sp-comm" style="color:var(--blue);font-weight:700;">₭0</span>
-        </div>
-        <div>
-          <div style="color:var(--text-faint);margin-bottom:2px;">ລາຍຮັບລວມ</div>
-          <span id="sp-rev2" style="color:var(--gold);font-weight:700;">₭0</span>
-        </div>
-      </div>
     </div>
 
     <div class="fgr"><label>ບັນຫາ / ໝາຍເຫດ</label><textarea id="sr-n" rows="2" placeholder="ອະທິບາຍ..."></textarea></div>
@@ -2205,16 +2195,21 @@ function updateShiftPreview(){
 
   const ne = document.getElementById('sp-net');
   if(ne){ ne.textContent=fmt(net); ne.style.color=net>=0?'var(--green)':'var(--red)'; }
-
-  const cm = document.getElementById('sp-comm');
-  if(cm) cm.parentElement.style.display='none';
 }
 
 function submitShiftReport(){
+  // ອ່ານຄ່າຈາກ form ຄັ້ງດຽວ ແລ້ວສົ່ງຕໍ່ໄປ — ບໍ່ອ່ານຊ້ຳຈາກ DOM ພາຍຫຼັງ
+  // (ການອ່ານຊ້ຳເຄີຍເປັນສາເຫດເຮັດໃຫ້ຂໍ້ມູນກາຍເປັນ 0 ຫຼັງຢືນຢັນສ່ວນຕ່າງຕິດລົບ,
+  //  ເພາະ input ໃນ modal ຖືກແທນທີ່ໄປແລ້ວຕອນສະແດງກ່ອງຢືນຢັນ)
+  const close = Number(document.getElementById('sr-close')?.value)||0;
+  const wth   = Number(document.getElementById('sr-w')?.value)||0;
+  const prz   = Number(document.getElementById('sr-p')?.value)||0;
+  const notes = document.getElementById('sr-n')?.value||'';
+  finalizeShiftReport(close, wth, prz, notes);
+}
+
+function finalizeShiftReport(close, wth, prz, notes){
   const openBal = SESSION.shiftOpenBal||0;
-  const close   = Number(document.getElementById('sr-close')?.value)||0;
-  const wth     = Number(document.getElementById('sr-w').value)||0;
-  const prz     = Number(document.getElementById('sr-p').value)||0;
   const dep     = close - openBal;   // ຍອດເຕີມ = ປິດ − ເປີດ
   const rev     = dep - wth - prz;   // ສ່ວນຕ່າງ
 
@@ -2234,20 +2229,17 @@ function submitShiftReport(){
         </div>
         <div style="margin-top:14px;font-size:12px;color:var(--text-dim);">ກວດຄືນຕົວເລກຖືກຕ້ອງແລ້ວໃຊ່ບໍ່?</div>
       </div>`,
-      [{label:'✓ ຖືກຕ້ອງ ດຳເນີນຕໍ່',cls:'btn btn-red',fn:()=>{ closeModal(); submitShiftReport(); }},
+      [{label:'✓ ຖືກຕ້ອງ ດຳເນີນຕໍ່',cls:'btn btn-red',fn:()=>{ closeModal(); finalizeShiftReport(close, wth, prz, notes); }},
        {label:'◀ ກັບໄປແກ້ໄຂ',cls:'btn btn-outline',fn:()=>{ window._shiftNegConfirmed=false; closeModal(); tryEndShift(); }}]
     );
     return;
   }
   window._shiftNegConfirmed = false;
   const bon=0;
-  const notes=document.getElementById('sr-n').value;
   const amount=Math.max(dep,0);
 
-  // add revenue entry
-  if(dep>0||rev>0){
-    DB.revenues.unshift({id:uid(),date:today(),empId:SESSION.user.id,empName:SESSION.user.name,amount:amount,deposit:dep,withdraw:wth,prize:prz,bonus:bon,notes:notes||'ລາຍງານ Shift',shiftReport:true});
-  }
+  // add revenue entry — ບັນທຶກທຸກກໍລະນີ (ລວມທັງສ່ວນຕ່າງຕິດລົບ) ເພື່ອບໍ່ໃຫ້ຂໍ້ມູນຫາຍ
+  DB.revenues.unshift({id:uid(),date:today(),empId:SESSION.user.id,empName:SESSION.user.name,amount:amount,deposit:dep,withdraw:wth,prize:prz,bonus:bon,notes:notes||'ລາຍງານ Shift',shiftReport:true});
 
   // close shift log
   const hours=(SESSION.shiftElapsed || Math.floor((Date.now()-SESSION.shiftStart)/1000))/3600;
@@ -2261,7 +2253,7 @@ function submitShiftReport(){
   if(e){ e.status='OFFLINE'; }
 
   if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
-  SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null;
+  SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null; SESSION.shiftOpenBal=0;
   saveShiftState(); // clear persisted shift
 
   addLog(SESSION.user.name,`ສິ້ນສຸດ Shift ລາຍຮັບ ${fmt(rev)}`,'shift');
@@ -2642,28 +2634,54 @@ function pgCommission(){
       <div class="tw">
         <table>
           <thead><tr><th>ພະນັກງານ</th><th>ເງິນເດືອນ</th><th>ລາຍຮັບຈິງ</th><th>ອັດຕາ</th><th>Commission</th><th>ລວມ</th></tr></thead>
-          <tbody>
-            ${DB.employees.map(e=>{
-              const empRevs=DB.revenues.filter(r=>(r.empId===e.id||r.empName===e.name)&&r.date.startsWith(today().slice(0,7)));
-              const rev=empRevs.reduce((a,b)=>a+b.amount,0);
-              const t=getCommTier(rev);
-              const comm=rev*t.rate/100;
-              return `<tr>
-                <td class="tg bold">${e.name}</td>
-                <td>${fmt(e.salary)}</td>
-                <td class="tgr">${fmt(rev)}</td>
-                <td class="to">${t.rate}%</td>
-                <td class="tg">${fmt(comm)}</td>
-                <td class="bold">${fmt(e.salary+comm)}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
+          <tbody id="comm-emp-tbody"></tbody>
         </table>
       </div>
     </div>
   </div>`;
   renderTierList();
+  renderCommEmpTable();
   updateCalc(SESSION.calcAmount);
+}
+
+function renderCommEmpTable(){
+  const tb = document.getElementById('comm-emp-tbody'); if(!tb) return;
+  tb.innerHTML = DB.employees.map(e=>{
+    const empRevs=DB.revenues.filter(r=>(r.empId===e.id||r.empName===e.name)&&r.date.startsWith(today().slice(0,7)));
+    const rev=empRevs.reduce((a,b)=>a+b.amount,0);
+    const rate = e.commission!=null ? e.commission : getCommTier(rev).rate;
+    const comm=rev*rate/100;
+    return `<tr>
+      <td class="tg bold">${e.name}</td>
+      <td>${fmt(e.salary)}</td>
+      <td class="tgr">${fmt(rev)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="number" value="${rate}" min="0" max="100" step="0.1"
+            style="width:58px;text-align:center;padding:5px 6px;font-size:12px;color:var(--gold);font-weight:700;"
+            onchange="updateEmpCommRate(${e.id}, this.value)">
+          <span class="to" style="font-size:12px;">%</span>
+        </div>
+      </td>
+      <td class="tg" id="comm-val-${e.id}">${fmt(comm)}</td>
+      <td class="bold" id="comm-total-${e.id}">${fmt(e.salary+comm)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function updateEmpCommRate(empId, val){
+  const rate = Math.max(0, Math.min(100, Number(val)||0));
+  const e = DB.employees.find(x=>x.id===empId);
+  if(!e) return;
+  e.commission = rate;
+  saveData();
+  addLog(SESSION.user.name, `ແກ້ໄຂອັດຕາ Commission ຂອງ ${e.name} ເປັນ ${rate}%`, 'settings');
+  const empRevs=DB.revenues.filter(r=>(r.empId===e.id||r.empName===e.name)&&r.date.startsWith(today().slice(0,7)));
+  const rev=empRevs.reduce((a,b)=>a+b.amount,0);
+  const comm=rev*rate/100;
+  const cv=document.getElementById('comm-val-'+empId); if(cv) cv.textContent=fmt(comm);
+  const ct=document.getElementById('comm-total-'+empId); if(ct) ct.textContent=fmt(e.salary+comm);
+  showToast(`ບັນທຶກອັດຕາ Commission ${e.name}: ${rate}% ✓`);
 }
 
 function renderTierList(){
@@ -3532,8 +3550,9 @@ function pgReports(){
     <div class="ph">
       <div class="pt">📊 ລາຍງານ</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-blue" onclick="exportCSVRange()" style="font-size:12px;">📥 CSV</button>
-        <button class="btn btn-gold" onclick="exportAllData()" style="font-size:12px;">📦 JSON</button>
+        <button class="btn btn-gold" onclick="exportExcelReport()" style="font-size:12px;">📥 ດາວໂຫຼດ Excel</button>
+        <button class="btn btn-blue" onclick="exportCSVRange()" style="font-size:12px;">📄 CSV</button>
+        <button class="btn btn-outline" onclick="exportAllData()" style="font-size:12px;">📦 JSON</button>
       </div>
     </div>
 
@@ -3886,6 +3905,103 @@ function renderRptExpTable(q){
   </div>`;
 }
 
+// ============================================================
+// EXCEL EXPORT — ຮູບແບບຕາມໄຟລ໌ "ສະຫຼຸບເວັບ" ຂອງຮ້ານ
+// ============================================================
+async function exportExcelReport(){
+  if(typeof ExcelJS==='undefined'){ showToast('ບໍ່ພົບໄລບຣາຣີ Excel — ກວດການເຊື່ອມຕໍ່ອິນເຕີເນັດ','error'); return; }
+  const from = _rptFrom, to = _rptTo;
+  const revs = getRptRevs(), exps = getRptExps();
+
+  const dep = revs.reduce((a,b)=>a+(b.deposit||0),0);
+  const wit = revs.reduce((a,b)=>a+(b.withdraw||0),0);
+  const prz = revs.reduce((a,b)=>a+(b.prize||0),0);
+
+  // ຍອດເງິນສຳຮອງຍົກມາ = ຍອດເງິນສຳຮອງ ກ່ອນວັນທີເລີ່ມຕົ້ນຂອງໄລຍະນີ້
+  const r = getReserve();
+  const txs = r.transactions||[];
+  const bfBalance = txs.filter(t=>(t.date||'')<from).reduce((a,b)=>a+(b.type==='in'?b.amount:-b.amount),0);
+  const reserveInPeriod = txs.filter(t=>t.type==='in'&&(t.date||'')>=from&&(t.date||'')<=to).reduce((a,b)=>a+b.amount,0);
+
+  const days = Math.max(1,Math.round((new Date(to)-new Date(from))/864e5)+1);
+
+  const wb = new ExcelJS.Workbook();
+  const monthLabel = to.slice(0,7);
+  const sh = wb.addWorksheet('ເດືອນ'+monthLabel.slice(5,7));
+
+  sh.columns = [{width:8.66},{width:44.83},{width:32.5},{width:25},{width:8.66}];
+
+  const FONT = 'Saysettha OT';
+  const blue = 'FF1F4E78', blue2='FF2E75B6', blue3='FF0070C0', green='FF00B050', lightBlue='FFD9E1F2', lightGreen='FFC6E0B4';
+  const white = {argb:'FFFFFFFF'}, black={argb:'FF000000'}, blueTxt={argb:'FF0000FF'}, gray={argb:'FF808080'};
+
+  const setCell = (addr, val, opt={}) => {
+    const c = sh.getCell(addr);
+    c.value = val;
+    c.font = Object.assign({name:FONT, size:opt.size||12, bold:!!opt.bold, color:opt.color||black}, opt.font||{});
+    c.alignment = Object.assign({vertical:'middle', horizontal:opt.align||'left', wrapText:!!opt.wrap}, opt.alignment||{});
+    if(opt.fill) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:opt.fill}};
+    if(opt.numFmt) c.numFmt = opt.numFmt;
+    if(opt.border!==false) c.border = {top:{style:'thin'},bottom:{style:'thin'},left:{style:'thin'},right:{style:'thin'}};
+    return c;
+  };
+  const mergeRow = (row, text, opt={}) => {
+    sh.mergeCells(`B${row}:D${row}`);
+    setCell(`B${row}`, text, Object.assign({align:'center', border:false}, opt));
+  };
+
+  // ── HEADER ──
+  mergeRow(1, `ສະຫຼຸບເວັບ ${DB.settings.storeName||'4king77'}`, {size:14, fill:blue, color:white});
+  sh.getRow(1).height = 29;
+  mergeRow(2, `ວັນທີ ${from} - ${to} (${days} ວັນ)`, {size:14, fill:blue, color:white});
+  sh.getRow(2).height = 27.75;
+  mergeRow(3, 'ໜ່ວຍ: ກີບ (LAK)', {bold:true});
+
+  // ── 1. ລາຍການເຕີມ + ຖອນ + ລະບົບເວັບ ──
+  mergeRow(5, '1. ລາຍການເຕີມ + ຖອນ + ລະບົບເວັບ', {bold:true, fill:blue2, color:white, align:'left'});
+  setCell('B6','ລາຍການ',{bold:true, align:'center'}); setCell('C6','ຈຳນວນເງິນ',{bold:true, align:'center'}); setCell('D6','ໝາຍເຫດ',{bold:true, align:'center'});
+  setCell('B7','ລາຍຮັບຈາກການເຕີມ'); setCell('C7',dep,{color:blueTxt, numFmt:'#,##0'}); setCell('D7','');
+  setCell('B8','ລາຍຈ່າຍຈາກການຖອນ'); setCell('C8',wit,{color:blueTxt, numFmt:'#,##0'}); setCell('D8','');
+  setCell('B9','ຄ່າບໍລິການ'); setCell('C9',prz,{color:blueTxt, numFmt:'#,##0'}); setCell('D9','');
+  setCell('B10','ລະບົບເວັບ 25%'); setCell('C10',{formula:'(C7-(C8+C9))*25%'},{color:blueTxt, numFmt:'#,##0'}); setCell('D10','');
+  setCell('B11','ສະຫຼຸບກຳໄລຈາກເວັບ',{bold:true, fill:lightBlue}); setCell('C11',{formula:'C7-C8-C10'},{bold:true, fill:lightBlue, numFmt:'#,##0'}); setCell('D11','',{fill:lightBlue});
+
+  // ── 2. ລາຍຈ່າຍຄົງທີ່ ──
+  mergeRow(13, '2. ລາຍຈ່າຍຄົງທີ່', {bold:true, fill:blue2, color:white, align:'left'});
+  setCell('B14','ລາຍການ',{bold:true, align:'center'}); setCell('C14','ຈຳນວນເງິນ',{bold:true, align:'center'}); setCell('D14','ໝາຍເຫດ',{bold:true, align:'center'});
+  let row = 15;
+  if(exps.length===0){ setCell(`B${row}`,'(ບໍ່ມີລາຍຈ່າຍໃນໄລຍະນີ້)'); setCell(`C${row}`,0,{color:blueTxt, numFmt:'#,##0'}); setCell(`D${row}`,''); row++; }
+  else exps.forEach(e=>{ setCell(`B${row}`,e.name); setCell(`C${row}`,e.amount,{color:blueTxt, numFmt:'#,##0'}); setCell(`D${row}`,e.notes||'',{color:gray}); row++; });
+  const expStart=15, expEnd=row-1;
+  setCell(`B${row}`,'ລວມລາຍຈ່າຍ',{bold:true, fill:lightBlue}); setCell(`C${row}`,{formula:`SUM(C${expStart}:C${expEnd})`},{bold:true, fill:lightBlue, numFmt:'#,##0'}); setCell(`D${row}`,'',{fill:lightBlue});
+  const sumExpRow = row; row+=2;
+
+  setCell(`B${row}`,'ກຳໄລ / ຂາດທຶນສຸດທິ',{bold:true, size:14, fill:lightGreen}); setCell(`C${row}`,{formula:`C11-C${sumExpRow}`},{bold:true, size:14, fill:lightGreen, numFmt:'#,##0;\\-#,##0'}); setCell(`D${row}`,'',{fill:lightGreen});
+  sh.getRow(row).height = 29;
+  row += 2;
+
+  // ── 3. ເງິນສຳຮອງ ──
+  mergeRow(row, '3. ເງິນສຳຮອງ', {bold:true, fill:blue3, color:white, align:'left'}); const sec3Row=row; row++;
+  setCell(`B${row}`,'ລາຍການ',{bold:true, align:'center'}); setCell(`C${row}`,'ຈຳນວນເງິນ',{bold:true, align:'center'}); setCell(`D${row}`,'ໝາຍເຫດ',{bold:true, align:'center'}); row++;
+  const accFmt = '_(* #,##0.00_);_(* \\(#,##0.00\\);_(* "-"??_);_(@_)';
+  setCell(`B${row}`,'ຍອດເງິນສຳຮອງຍົກມາ'); setCell(`C${row}`,bfBalance,{color:{argb:'FF0011FF'}, numFmt:accFmt}); const rowResBF=row; row++;
+  setCell(`B${row}`,'ເງີນສຳຮອງທີ່ຈ່າຍໄປ'); setCell(`C${row}`,{formula:`C${sumExpRow}`},{color:{argb:'FF0011FF'}, numFmt:accFmt}); const rowResPaid=row; row++;
+  setCell(`B${row}`,'ເງີນສຳຮອງທີ່ເຕີມເຂົ້າ'); setCell(`C${row}`,reserveInPeriod,{color:{argb:'FF0011FF'}, numFmt:accFmt}); const rowResIn=row; row++;
+  setCell(`B${row}`,'ຍອດເງິນສຳຮອງທີ່ຍັງເຫຼືອ',{bold:true}); setCell(`C${row}`,{formula:`C${rowResBF}-C${rowResPaid}+C${rowResIn}`},{bold:true, numFmt:'#,##0'}); setCell(`D${row}`,'');
+  row += 2;
+
+  // ── 4. ຍອດເງີນຄົງເຫຼືອໃນທະນາຄານ ──
+  setCell(`B${row}`,'4. ຍອດເງີນຄົງເຫຼືອໃນທະນາຄານ',{bold:true, size:16, fill:green, color:white});
+  setCell(`C${row}`,null,{bold:true, size:16, fill:green, numFmt:'0.00'});
+  setCell(`D${row}`,'',{fill:green});
+  sh.getRow(row).height = 32;
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`4king77_ສະຫຼຸບເວັບ_${from}_${to}.xlsx`; a.click();
+  showToast('Export Excel ສຳເລັດ');
+}
+
 function exportCSVRange(){
   const revs=getRptRevs(), exps=getRptExps();
   const rows=[['=== ລາຍຮັບ ==='],['ວັນທີ','ພະນັກງານ','ລາຍຮັບ','ຝາກ','ຖອນ','ຄ່າທຳນຽມ','Bonus','Commission','ໝາຍເຫດ']];
@@ -3987,6 +4103,37 @@ function clearLogs(){ if(!confirm('ລ້າງ Log ທັງໝົດ?')) retur
 // ============================================================
 // PAGE: SETTINGS
 // ============================================================
+function resetMonthData(){
+  const monthVal = document.getElementById('reset-month-val')?.value || today().slice(0,7);
+  showModal('🗑 Reset ຂໍ້ມູນລາຍເດືອນ',`
+    <div style="text-align:center;padding:10px 0;">
+      <div style="font-size:40px;margin-bottom:10px;">⚠️</div>
+      <div style="font-size:14px;color:var(--red);font-weight:700;margin-bottom:8px;">ລຶບຂໍ້ມູນຂອງເດືອນ ${monthVal}!</div>
+      <div style="font-size:12px;color:var(--text-dim);">ລາຍຮັບ, Shift logs, ການແຈ້ງເຕືອນ, Activity logs<br>ຂອງເດືອນນີ້ຈະຖືກລຶບ — ຂໍ້ມູນເດືອນອື່ນຍັງຢູ່ຄືເກົ່າ ບໍ່ສາມາດກູ້ຄືນໄດ້</div>
+    </div>`,
+    [{label:'🗑 ຢືນຢັນ Reset ເດືອນນີ້',cls:'btn btn-red',fn:()=>{
+      const before = { rev:DB.revenues.length, sh:DB.shiftLogs.length, notif:DB.notifications.length, log:DB.actLogs.length };
+      DB.revenues      = DB.revenues.filter(r=>!(r.date||'').startsWith(monthVal));
+      DB.shiftLogs     = DB.shiftLogs.filter(s=>!(s.date||'').startsWith(monthVal));
+      DB.notifications = DB.notifications.filter(n=>!(n.date||n.time||'').startsWith(monthVal));
+      DB.actLogs        = DB.actLogs.filter(l=>!(l.date||'').startsWith(monthVal));
+      // ຖ້າ shift ຂອງ session ປັດຈຸບັນຢູ່ໃນເດືອນທີ່ຖືກລຶບ → ປິດ session ນັ້ນ
+      if(SESSION.shiftActive && today().startsWith(monthVal)){
+        if(SESSION.shiftInterval){ clearInterval(SESSION.shiftInterval); SESSION.shiftInterval=null; }
+        SESSION.shiftActive=false; SESSION.shiftElapsed=0; SESSION.shiftLogId=null; SESSION.shiftOpenBal=0;
+        localStorage.removeItem(SHIFT_KEY);
+      }
+      DB.employees.forEach(e=>{ if(today().startsWith(monthVal)) e.status='OFFLINE'; });
+      saveData();
+      closeModal();
+      const removed = before.rev-DB.revenues.length + before.sh-DB.shiftLogs.length;
+      showToast(`Reset ຂໍ້ມູນເດືອນ ${monthVal} ສຳເລັດ (${removed} ລາຍການ) ✓`);
+      navigate('settings');
+    }},
+    {label:'ຍົກເລີກ',cls:'btn btn-outline',fn:closeModal}]
+  );
+}
+
 function resetAllData(){
   showModal('🗑 Reset ຂໍ້ມູນທັງໝົດ',`
     <div style="text-align:center;padding:10px 0;">
@@ -4094,6 +4241,18 @@ function pgSettings(){
         <button class="btn btn-blue" onclick="exportAllData()" style="font-size:12px;">📦 Export JSON</button>
         <button class="btn btn-outline" onclick="importDataPrompt()" style="font-size:12px;">📥 Import JSON</button>
         <button class="btn btn-red" onclick="resetAll()" style="font-size:12px;">🔄 Reset Default</button>
+      </div>
+    </div>
+
+    <div class="card p24" style="border-color:rgba(255,68,85,0.3);">
+      <div class="st" style="color:var(--red);">🗑 Reset ຂໍ້ມູນລາຍເດືອນ</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;line-height:1.7;">ລ້າງລາຍຮັບ, Shift logs, ການແຈ້ງເຕືອນ ແລະ Activity logs ສະເພາະເດືອນທີ່ເລືອກ — ຂໍ້ມູນເດືອນອື່ນຈະບໍ່ຖືກກະທົບ.</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="fgr" style="width:170px;">
+          <label>ເລືອກເດືອນ</label>
+          <input type="month" id="reset-month-val" value="${today().slice(0,7)}">
+        </div>
+        <button class="btn btn-red" onclick="resetMonthData()" style="font-size:12px;">🗑 Reset ເດືອນນີ້</button>
       </div>
     </div>
 
